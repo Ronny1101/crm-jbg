@@ -359,6 +359,10 @@ document.addEventListener('DOMContentLoaded', function() {
         <span>Actividad</span>
         <span class="nav-pulse" id="live-dot"></span>
       </div>
+      <div class="nav-item" id="n-usuarios" onclick="showPage('usuarios')" style="display:none">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        <span>Usuarios</span>
+      </div>
       <div class="nav-section">Financiero</div>
       <div class="nav-item" id="n-garantias" onclick="showPage('garantias')">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
@@ -495,6 +499,42 @@ document.addEventListener('DOMContentLoaded', function() {
         <div class="page-sub">Todos los cambios en tiempo real — se actualiza automáticamente</div>
       </div>
       <div class="feed-list" id="feed-list"></div>
+    </div>
+
+    <!-- USUARIOS (solo admin) -->
+    <div class="page" id="page-usuarios">
+      <div class="page-header">
+        <div class="page-title">Gestión de usuarios</div>
+        <div class="page-sub">Administra roles y accesos del equipo</div>
+      </div>
+      <div class="kpi-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:20px" id="usr-kpis"></div>
+      <div class="table-card">
+        <div class="toolbar">
+          <div class="search-box">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input id="usr-search" placeholder="Buscar por correo o nombre..." oninput="filterUsuarios()">
+          </div>
+          <select class="flt" id="usr-rol-filter" onchange="filterUsuarios()">
+            <option value="">Todos los roles</option>
+            <option value="admin">Admin</option>
+            <option value="visor">Visor</option>
+          </select>
+          <span class="tcount" id="usr-count">–</span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>Usuario</th>
+              <th>Correo</th>
+              <th>Rol actual</th>
+              <th>Último acceso</th>
+              <th>Estado</th>
+              <th>Acciones</th>
+            </tr></thead>
+            <tbody id="usr-body"></tbody>
+          </table>
+        </div>
+      </div>
     </div>
 
     <!-- GARANTIAS -->
@@ -634,14 +674,25 @@ var garFiltered=[], garPage=1, garSortKey='arrendatario', garSortDir=1;
 // FIREBASE CONFIG (guardada en localStorage)
 // ══════════════════════════════════════════════
 // ══ ROLES ══════════════════════════════════════
-// admin: puede editar y aprobar cambios
-// viewer: solo lectura, puede solicitar cambios
 const ADMIN_EMAILS = [
   'raytbsc111@gmail.com',
   'rayt123@hotmail.com',
 ];
+var userRolesCache = {}; // { uid: { role, email, name, lastAccess, disabled } }
+
 function isAdmin() {
-  return currentUser && ADMIN_EMAILS.includes(currentUser.email);
+  if (!currentUser) return false;
+  // Check Firestore role first, fallback to hardcoded emails
+  const r = userRolesCache[currentUser.uid];
+  if (r) return r.role === 'admin';
+  return ADMIN_EMAILS.includes(currentUser.email);
+}
+
+function getUserRole() {
+  if (!currentUser) return 'visor';
+  const r = userRolesCache[currentUser.uid];
+  if (r) return r.role || 'visor';
+  return ADMIN_EMAILS.includes(currentUser.email) ? 'admin' : 'visor';
 }
 
 const LS_KEY = 'crm_firebase_cfg';
@@ -696,9 +747,18 @@ async function connectFirebase(cfg) {
 // AUTH
 // ══════════════════════════════════════════════
 function setupAuthListener() {
-  firebase.auth().onAuthStateChanged(user => {
+  firebase.auth().onAuthStateChanged(async user => {
     if (user) {
       currentUser = user;
+      // Check if user is disabled
+      try {
+        const roleDoc = await db.collection('user_roles').doc(user.uid).get();
+        if (roleDoc.exists && roleDoc.data().disabled) {
+          await firebase.auth().signOut();
+          showLoginErr('Tu acceso ha sido desactivado. Contacta al administrador.');
+          return;
+        }
+      } catch(e) {}
       document.getElementById('login-screen').style.display = 'none';
       document.getElementById('loading-overlay').style.display = 'none';
       if (!document.getElementById('app').style.display || document.getElementById('app').style.display === 'none') {
@@ -765,6 +825,14 @@ async function doLogout() {
 async function startApp() {
   hide('login-screen'); hide('setup-screen'); hide('loading-overlay');
   show('app');
+  // Load roles first
+  await loadUserRoles();
+  await registerUserAccess();
+  // Show admin-only nav items
+  if (isAdmin()) {
+    const navUsr = document.getElementById('n-usuarios');
+    if (navUsr) navUsr.style.display = 'flex';
+  }
   // Render user info
   const u = currentUser;
   const initials = (u.displayName || u.email || '?').slice(0,2).toUpperCase();
@@ -963,6 +1031,7 @@ function showPage(id) {
   if (id==='alertas') renderAlertas();
   if (id==='garantias') { renderGarKPIs(); filterGar(); }
   if (id==='polizas') { renderPolKPIs(); filterPol(); }
+  if (id==='usuarios') { renderUsuariosPage(); }
 }
 
 // ══════════════════════════════════════════════
@@ -1552,6 +1621,148 @@ function toast(title, msg, type='info') {
 // ══════════════════════════════════════════════
 // BOOT
 // ══════════════════════════════════════════════
+
+// ══════════════════════════════════════════════
+// USUARIOS
+// ══════════════════════════════════════════════
+async function loadUserRoles() {
+  try {
+    const snap = await db.collection('user_roles').get();
+    userRolesCache = {};
+    snap.forEach(doc => { userRolesCache[doc.id] = doc.data(); });
+  } catch(e) { console.warn('loadUserRoles:', e); }
+}
+
+async function registerUserAccess() {
+  if (!currentUser || !db) return;
+  try {
+    const role = ADMIN_EMAILS.includes(currentUser.email) ? 'admin' : 
+                 (userRolesCache[currentUser.uid]?.role || 'visor');
+    await db.collection('user_roles').doc(currentUser.uid).set({
+      email: currentUser.email,
+      name: currentUser.displayName || currentUser.email.split('@')[0],
+      photo: currentUser.photoURL || '',
+      role: role,
+      lastAccess: Date.now(),
+      disabled: false,
+    }, { merge: true });
+    userRolesCache[currentUser.uid] = { 
+      email: currentUser.email,
+      name: currentUser.displayName || currentUser.email.split('@')[0],
+      role: role,
+      lastAccess: Date.now(),
+      disabled: false,
+    };
+  } catch(e) { console.warn('registerUserAccess:', e); }
+}
+
+var usrFiltered = [];
+
+async function renderUsuariosPage() {
+  if (!isAdmin()) return;
+  // Load fresh
+  await loadUserRoles();
+  const users = Object.entries(userRolesCache).map(([uid, d]) => ({ uid, ...d }));
+  
+  const admins = users.filter(u => u.role === 'admin').length;
+  const visors = users.filter(u => u.role === 'visor').length;
+  const disabled = users.filter(u => u.disabled).length;
+  
+  document.getElementById('usr-kpis').innerHTML = `
+    <div class="kpi-card" style="--card-color:var(--accent)"><div class="kpi-label">Total usuarios</div><div class="kpi-val">${users.length}</div><div class="kpi-sub">registrados</div></div>
+    <div class="kpi-card" style="--card-color:var(--accent2)"><div class="kpi-label">Admins</div><div class="kpi-val">${admins}</div><div class="kpi-sub">acceso completo</div></div>
+    <div class="kpi-card" style="--card-color:var(--muted)"><div class="kpi-label">Visores</div><div class="kpi-val">${visors}</div><div class="kpi-sub">solo lectura</div></div>
+  `;
+  
+  usrFiltered = users;
+  filterUsuarios();
+}
+
+function filterUsuarios() {
+  const s = (document.getElementById('usr-search')?.value || '').toLowerCase();
+  const rol = document.getElementById('usr-rol-filter')?.value || '';
+  const all = Object.entries(userRolesCache).map(([uid, d]) => ({ uid, ...d }));
+  usrFiltered = all.filter(u => {
+    if (rol && u.role !== rol) return false;
+    if (s && !(u.email||'').toLowerCase().includes(s) && !(u.name||'').toLowerCase().includes(s)) return false;
+    return true;
+  });
+  document.getElementById('usr-count').textContent = usrFiltered.length + ' usuarios';
+  renderUsrTable();
+}
+
+function renderUsrTable() {
+  const tbody = document.getElementById('usr-body');
+  if (!tbody) return;
+  tbody.innerHTML = usrFiltered.map(u => {
+    const isMe = currentUser && u.uid === currentUser.uid;
+    const lastAccess = u.lastAccess ? new Date(u.lastAccess).toLocaleDateString('es-EC', {day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : '–';
+    const initials = (u.name||u.email||'?').slice(0,2).toUpperCase();
+    return `<tr>
+      <td>
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="width:30px;height:30px;border-radius:50%;background:${u.role==='admin'?'var(--accent)':'var(--accent2)'};color:#0f0f13;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0">
+            ${u.photo ? `<img src="${u.photo}" style="width:100%;height:100%;border-radius:50%;object-fit:cover">` : initials}
+          </div>
+          <div>
+            <div style="font-size:13px;font-weight:500">${u.name||'–'} ${isMe?'<span style="font-size:10px;color:var(--muted)">(tú)</span>':''}</div>
+          </div>
+        </div>
+      </td>
+      <td style="font-size:12px;color:var(--muted)">${u.email||'–'}</td>
+      <td>
+        <span class="badge ${u.role==='admin'?'bd-alq':'bd-oth'}">${u.role==='admin'?'Admin':'Visor'}</span>
+      </td>
+      <td style="font-size:12px;color:var(--muted)">${lastAccess}</td>
+      <td>
+        <span class="badge ${u.disabled?'bd-ven':'bd-vig'}">${u.disabled?'Desactivado':'Activo'}</span>
+      </td>
+      <td>
+        ${!isMe ? `
+        <div style="display:flex;gap:6px">
+          <button onclick="changeRole('${u.uid}','${u.role==='admin'?'visor':'admin'}')" 
+            style="background:none;border:1px solid var(--border);color:var(--text);padding:4px 10px;border-radius:6px;font-size:11px;cursor:pointer;font-family:'DM Sans',sans-serif">
+            → ${u.role==='admin'?'Visor':'Admin'}
+          </button>
+          <button onclick="toggleUser('${u.uid}',${!u.disabled})"
+            style="background:none;border:1px solid ${u.disabled?'var(--green)':'var(--red)'};color:${u.disabled?'var(--green)':'var(--red)'};padding:4px 10px;border-radius:6px;font-size:11px;cursor:pointer;font-family:'DM Sans',sans-serif">
+            ${u.disabled?'Activar':'Desactivar'}
+          </button>
+        </div>` : '<span style="font-size:11px;color:var(--muted)">Tu cuenta</span>'}
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+async function changeRole(uid, newRole) {
+  if (!isAdmin() || !db) return;
+  try {
+    await db.collection('user_roles').doc(uid).update({ role: newRole });
+    if (userRolesCache[uid]) userRolesCache[uid].role = newRole;
+    toast('Rol actualizado', `El usuario ahora es ${newRole === 'admin' ? 'Admin' : 'Visor'}.`, 'success');
+    renderUsrTable();
+    // Log activity
+    await db.collection('activity').add({
+      ts: Date.now(), ref: 0,
+      msg: `Rol cambiado: ${userRolesCache[uid]?.email} → ${newRole}`,
+      userId: currentUser.uid,
+      userName: currentUser.displayName || currentUser.email.split('@')[0],
+      photo: currentUser.photoURL || '',
+      type: 'admin'
+    });
+  } catch(e) { toast('Error', e.message, 'error'); }
+}
+
+async function toggleUser(uid, disable) {
+  if (!isAdmin() || !db) return;
+  try {
+    await db.collection('user_roles').doc(uid).update({ disabled: disable });
+    if (userRolesCache[uid]) userRolesCache[uid].disabled = disable;
+    toast(disable ? 'Usuario desactivado' : 'Usuario activado', '', disable ? 'warning' : 'success');
+    renderUsrTable();
+  } catch(e) { toast('Error', e.message, 'error'); }
+}
+
 (async function boot() {
   try {
     db   = firebase.firestore();
