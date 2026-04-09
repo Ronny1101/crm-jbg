@@ -503,9 +503,43 @@ document.addEventListener('DOMContentLoaded', function() {
 
     <!-- USUARIOS (solo admin) -->
     <div class="page" id="page-usuarios">
-      <div class="page-header">
-        <div class="page-title">Gestión de usuarios</div>
-        <div class="page-sub">Administra roles y accesos del equipo</div>
+      <div class="page-header" style="display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div class="page-title">Gestión de usuarios</div>
+          <div class="page-sub">Administra roles y accesos del equipo</div>
+        </div>
+        <button class="btn-save" onclick="showCreateUser()" style="white-space:nowrap">+ Crear usuario</button>
+      </div>
+      
+      <!-- Panel crear usuario -->
+      <div id="create-user-panel" style="display:none;background:var(--surface2);border:1px solid var(--accent);border-radius:12px;padding:20px;margin-bottom:20px">
+        <div style="font-size:14px;font-weight:600;color:var(--accent);margin-bottom:16px">Crear nuevo usuario</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+          <div>
+            <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:4px">Correo electrónico</label>
+            <input class="m-input" id="new-user-email" type="email" placeholder="correo@ejemplo.com" style="width:100%">
+          </div>
+          <div>
+            <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:4px">Contraseña temporal</label>
+            <input class="m-input" id="new-user-pass" type="text" placeholder="mínimo 6 caracteres" style="width:100%">
+          </div>
+          <div>
+            <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:4px">Nombre</label>
+            <input class="m-input" id="new-user-name" type="text" placeholder="Nombre completo" style="width:100%">
+          </div>
+          <div>
+            <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:4px">Rol</label>
+            <select class="m-select" id="new-user-rol" style="width:100%">
+              <option value="visor">Visor (solo lectura)</option>
+              <option value="admin">Admin (acceso completo)</option>
+            </select>
+          </div>
+        </div>
+        <div id="create-user-error" style="display:none;color:var(--red);font-size:12px;margin-bottom:10px"></div>
+        <div style="display:flex;gap:8px">
+          <button class="btn-save" onclick="createUser()">Crear usuario</button>
+          <button class="btn-cancel" onclick="hideCreateUser()">Cancelar</button>
+        </div>
       </div>
       <div class="kpi-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:20px" id="usr-kpis"></div>
       <div class="table-card">
@@ -989,7 +1023,7 @@ function getData() {
 }
 function fmt(n) {
   if (!n || n === 0) return '–';
-  return '$' + Number(n).toLocaleString('es-EC', {minimumFractionDigits:0,maximumFractionDigits:0});
+  return '$' + Number(n).toLocaleString('es-EC', {minimumFractionDigits:2,maximumFractionDigits:2});
 }
 function fmtA(n) { return n ? Number(n).toFixed(2) + ' m²' : '–'; }
 function fmtPct(n) { return n ? (n*100).toFixed(1)+'%' : '–'; }
@@ -1783,6 +1817,112 @@ async function toggleUser(uid, disable) {
     toast(disable ? 'Usuario desactivado' : 'Usuario activado', '', disable ? 'warning' : 'success');
     renderUsrTable();
   } catch(e) { toast('Error', e.message, 'error'); }
+}
+
+
+// ══ CREAR USUARIO ═══════════════════════════════
+function showCreateUser() {
+  document.getElementById('create-user-panel').style.display = 'block';
+  document.getElementById('create-user-error').style.display = 'none';
+  document.getElementById('new-user-email').value = '';
+  document.getElementById('new-user-pass').value = '';
+  document.getElementById('new-user-name').value = '';
+}
+
+function hideCreateUser() {
+  document.getElementById('create-user-panel').style.display = 'none';
+}
+
+async function createUser() {
+  const email = document.getElementById('new-user-email').value.trim();
+  const pass  = document.getElementById('new-user-pass').value.trim();
+  const name  = document.getElementById('new-user-name').value.trim();
+  const rol   = document.getElementById('new-user-rol').value;
+  const errEl = document.getElementById('create-user-error');
+  
+  if (!email || !pass || !name) {
+    errEl.textContent = 'Completa todos los campos.';
+    errEl.style.display = 'block';
+    return;
+  }
+  if (pass.length < 6) {
+    errEl.textContent = 'La contraseña debe tener al menos 6 caracteres.';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  const btn = document.querySelector('#create-user-panel .btn-save');
+  if (btn) { btn.textContent = 'Creando...'; btn.disabled = true; }
+  const reset = () => { if(btn){ btn.textContent='Crear usuario'; btn.disabled=false; } };
+
+  try {
+    // Create user with Firebase Auth via API
+    // We use a secondary auth instance to avoid logging out current admin
+    const cfg = {
+      apiKey: "AIzaSyD29xjSU51ea-nAXrdFd9BAHlrO0tKSaGo",
+      authDomain: "crm-inmobiliario-jbg.firebaseapp.com",
+      projectId: "crm-inmobiliario-jbg",
+      storageBucket: "crm-inmobiliario-jbg.firebasestorage.app",
+      messagingSenderId: "348772550546",
+      appId: "1:348772550546:web:cf3b39785ef2decfd2a34b"
+    };
+    
+    // Use REST API to create user without affecting current session
+    const resp = await fetch(
+      `https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${cfg.apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password: pass, returnSecureToken: true })
+      }
+    );
+    const result = await resp.json();
+    
+    if (result.error) {
+      let msg = result.error.message;
+      if (msg === 'EMAIL_EXISTS') msg = 'Ese correo ya está registrado.';
+      if (msg === 'WEAK_PASSWORD : Password should be at least 6 characters') msg = 'Contraseña muy corta (mínimo 6 caracteres).';
+      errEl.textContent = msg;
+      errEl.style.display = 'block';
+      reset();
+      return;
+    }
+
+    const uid = result.localId;
+    
+    // Save role in Firestore
+    await db.collection('user_roles').doc(uid).set({
+      email: email,
+      name: name,
+      photo: '',
+      role: rol,
+      lastAccess: Date.now(),
+      disabled: false,
+    });
+    
+    // Update local cache
+    userRolesCache[uid] = { email, name, role: rol, lastAccess: Date.now(), disabled: false };
+    
+    toast('Usuario creado', `${name} (${email}) registrado como ${rol === 'admin' ? 'Admin' : 'Visor'}.`, 'success');
+    hideCreateUser();
+    renderUsuariosPage();
+    reset();
+    
+    // Log activity
+    await db.collection('activity').add({
+      ts: Date.now(), ref: 0,
+      msg: `Nuevo usuario creado: ${email} (${rol})`,
+      userId: currentUser.uid,
+      userName: currentUser.displayName || currentUser.email.split('@')[0],
+      photo: currentUser.photoURL || '',
+      type: 'admin'
+    });
+
+  } catch(e) {
+    errEl.textContent = 'Error: ' + e.message;
+    errEl.style.display = 'block';
+    reset();
+  }
 }
 
 (async function boot() {
