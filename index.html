@@ -664,7 +664,7 @@ document.addEventListener('DOMContentLoaded', function() {
           </div>
           <div>
             <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:4px">Etapa inicial</label>
-            <select class="m-select" id="rn-etapa" style="width:100%"><option value="docusign">DocuSign enviado</option><option value="cumplimiento">Firmas cumplimiento</option><option value="documentacion">Documentación lista</option><option value="gerencia">Revisión gerencia/auditoría</option><option value="condiciones">Condiciones aprobadas</option><option value="elaboracion">Elaboración contrato</option><option value="firma_ds">Firmas DocuSign listas</option><option value="firma_arren">Firma arrendatario</option><option value="firma_jbg">Firma JBG</option><option value="notariado">Notarizado</option></select>
+            <select class="m-select" id="rn-etapa" style="width:100%"><option value="docusign">DocuSign enviado</option><option value="cumplimiento">Pendiente firmas cumplimiento</option><option value="documentacion">Pendiente documentación</option><option value="gerencia">Pendiente revisión gerencia/auditoría</option><option value="condiciones">Pendiente aprobación condiciones</option><option value="elaboracion">En elaboración de contrato</option><option value="firma_ds">Pendiente firmas DocuSign</option><option value="firma_arren">Pendiente firma arrendatario</option><option value="firma_jbg">Pendiente firma JBG</option><option value="pend_notarizar">Pendiente notarización</option><option value="notariado">Notarizado ✓</option></select>
           </div>
           <div>
             <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:4px">Responsable</label>
@@ -690,7 +690,7 @@ document.addEventListener('DOMContentLoaded', function() {
           </div>
           <select class="flt" id="rn-filter-etapa" onchange="renderRenovaciones()">
             <option value="">Todas las etapas</option>
-            <option value="docusign">DocuSign enviado</option><option value="cumplimiento">Firmas cumplimiento</option><option value="documentacion">Documentación lista</option><option value="gerencia">Revisión gerencia/auditoría</option><option value="condiciones">Condiciones aprobadas</option><option value="elaboracion">Elaboración contrato</option><option value="firma_ds">Firmas DocuSign listas</option><option value="firma_arren">Firma arrendatario</option><option value="firma_jbg">Firma JBG</option><option value="notariado">Notarizado</option>
+            <option value="docusign">DocuSign enviado</option><option value="cumplimiento">Pendiente firmas cumplimiento</option><option value="documentacion">Pendiente documentación</option><option value="gerencia">Pendiente revisión gerencia/auditoría</option><option value="condiciones">Pendiente aprobación condiciones</option><option value="elaboracion">En elaboración de contrato</option><option value="firma_ds">Pendiente firmas DocuSign</option><option value="firma_arren">Pendiente firma arrendatario</option><option value="firma_jbg">Pendiente firma JBG</option><option value="pend_notarizar">Pendiente notarización</option><option value="notariado">Notarizado ✓</option>
           </select>
           <span class="tcount" id="rn-count">–</span>
         </div>
@@ -2067,16 +2067,17 @@ async function createUser() {
 // RENOVACIONES
 // ══════════════════════════════════════════════
 const ETAPAS = [
-  {id:'docusign',     label:'DocuSign enviado',           color:'#5e8fd4'},
-  {id:'cumplimiento', label:'Firmas cumplimiento',         color:'#a78bfa'},
-  {id:'documentacion',label:'Documentación lista',         color:'#f59e0b'},
-  {id:'gerencia',     label:'Revisión gerencia/auditoría', color:'#fb923c'},
-  {id:'condiciones',  label:'Condiciones aprobadas',       color:'#34d399'},
-  {id:'elaboracion',  label:'Elaboración contrato',        color:'#60a5fa'},
-  {id:'firma_ds',     label:'Firmas DocuSign listas',      color:'#818cf8'},
-  {id:'firma_arren',  label:'Firma arrendatario',          color:'#f472b6'},
-  {id:'firma_jbg',    label:'Firma JBG',                   color:'#94a3b8'},
-  {id:'notariado',    label:'Notarizado ✓',                color:'#4ade80'},
+  {id:'docusign',     label:'DocuSign enviado',                    color:'#5e8fd4'},
+  {id:'cumplimiento', label:'Pendiente firmas cumplimiento',        color:'#a78bfa'},
+  {id:'documentacion',label:'Pendiente documentación',              color:'#f59e0b'},
+  {id:'gerencia',     label:'Pendiente revisión gerencia/auditoría',color:'#fb923c'},
+  {id:'condiciones',  label:'Pendiente aprobación condiciones',     color:'#60a5fa'},
+  {id:'elaboracion',  label:'En elaboración de contrato',           color:'#818cf8'},
+  {id:'firma_ds',     label:'Pendiente firmas DocuSign',            color:'#c084fc'},
+  {id:'firma_arren',  label:'Pendiente firma arrendatario',         color:'#f472b6'},
+  {id:'firma_jbg',    label:'Pendiente firma JBG',                  color:'#94a3b8'},
+  {id:'pend_notarizar',label:'Pendiente notarización',              color:'#fbbf24'},
+  {id:'notariado',    label:'Notarizado ✓',                         color:'#4ade80'},
 ];
 
 var renovCache = [];
@@ -2098,6 +2099,16 @@ function subscribeRenovaciones() {
 function showAddRenovacion() {
   const panel = document.getElementById('add-renov-panel');
   panel.style.display = 'block';
+  // Always reset form for NEW record
+  document.getElementById('rn-arren').value = '';
+  document.getElementById('rn-bien').value = '';
+  document.getElementById('rn-vence').value = '';
+  document.getElementById('rn-nota').value = '';
+  document.getElementById('rn-resp').value = '';
+  document.getElementById('rn-etapa').value = 'docusign';
+  // Reset save button to create mode
+  const btn = document.querySelector('#add-renov-panel .btn-save');
+  if (btn) { btn.textContent = 'Guardar'; btn.onclick = ()=>saveRenovacion(null); }
   // Populate arrendatarios datalist
   const dl = document.getElementById('rn-arren-list');
   const data = getData();
@@ -2137,14 +2148,14 @@ async function saveRenovacion(editId) {
   };
 
   try {
-    if (editId) {
+    if (editId && editId !== null && editId !== 'null') {
       const existing = renovCache.find(r=>r.id===editId);
       const historial = existing?.historial || [];
       if (!historial.find(h=>h.etapa===etapa)) {
         historial.push({ etapa, fecha: new Date().toISOString().slice(0,10), user: currentUser.email });
       }
       await db.collection('renovaciones').doc(editId).update({ arren, bien, vence, etapa, resp, nota, historial });
-      toast('Renovación actualizada', '', 'success');
+      toast('Renovación actualizada', arren, 'success');
     } else {
       await db.collection('renovaciones').add(doc);
       toast('Renovación creada', arren, 'success');
