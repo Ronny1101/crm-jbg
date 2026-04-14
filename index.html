@@ -1361,22 +1361,44 @@ function renderAlertas() {
     <div class="kpi-card" style="--card-color:var(--red)"><div class="kpi-label">Vencidos activos</div><div class="kpi-val">${vencido}</div></div>
     <div class="kpi-card" style="--card-color:var(--green)"><div class="kpi-label">Vigentes</div><div class="kpi-val">${vigente}</div></div>
   `;
-  const proximos=data.filter(r=>{ if(!r.fv) return false; const diff=(new Date(r.fv)-today)/86400000; return diff>=0&&diff<=60; })
-    .sort((a,b)=>new Date(a.fv)-new Date(b.fv));
-  const list=document.getElementById('alert-list');
-  if(!proximos.length){list.innerHTML='<div style="text-align:center;padding:40px;color:var(--muted);font-size:13px">Sin contratos por vencer en 60 días.</div>';return;}
-  list.innerHTML=proximos.map(r=>{
-    const diff=Math.round((new Date(r.fv)-today)/86400000);
-    const col=diff<=15?'var(--red)':diff<=30?'var(--orange)':'var(--accent2)';
+  // Lista completa: vencidos + por vencer (≤60d) + vigentes más allá de 60d
+  const conFecha = data.filter(r => r.fv).sort((a,b) => new Date(a.fv) - new Date(b.fv));
+  const list = document.getElementById('alert-list');
+  if (!conFecha.length) {
+    list.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted);font-size:13px">Sin contratos con fecha de vencimiento registrada.</div>';
+    return;
+  }
+
+  // Separar en 3 grupos
+  const vencidos60  = conFecha.filter(r => { const d=(new Date(r.fv)-today)/86400000; return d < 0; });
+  const proximos60  = conFecha.filter(r => { const d=(new Date(r.fv)-today)/86400000; return d >= 0 && d <= 60; });
+  const masAdelante = conFecha.filter(r => { const d=(new Date(r.fv)-today)/86400000; return d > 60; });
+
+  function renderFila(r) {
+    const diff = Math.round((new Date(r.fv) - today) / 86400000);
+    const col  = diff < 0 ? 'var(--red)' : diff <= 15 ? 'var(--red)' : diff <= 60 ? 'var(--orange)' : 'var(--green)';
+    const label = diff < 0 ? `Vencido hace ${Math.abs(diff)} días` : diff === 0 ? 'Vence hoy' : `${diff} días`;
     return `<div class="alert-item" onclick="openModal(${r.ref})">
       <div class="alert-dot" style="background:${col}"></div>
       <div class="alert-info">
         <div class="alert-main">${r.ar||'Sin arrendatario'} · ${r.e}</div>
-        <div class="alert-sub">Ref #${r.ref} · ${r.tb} · ${fmtA(r.a)} · ${fmt(r.cm)}/mes</div>
+        <div class="alert-sub">Ref #${r.ref} · ${r.tb} · ${fmtA(r.a)} · ${fmt(r.cm)}/mes · Vence: ${r.fv}</div>
       </div>
-      <div class="alert-days" style="color:${col}">${diff} días</div>
+      <div class="alert-days" style="color:${col};white-space:nowrap">${label}</div>
     </div>`;
-  }).join('');
+  }
+
+  function seccion(titulo, color, items) {
+    if (!items.length) return '';
+    return `<div style="font-size:11px;font-weight:700;color:${color};text-transform:uppercase;letter-spacing:.6px;padding:10px 16px 4px">
+      ${titulo} (${items.length})
+    </div>${items.map(renderFila).join('')}`;
+  }
+
+  list.innerHTML =
+    seccion('🔴 Vencidos activos', 'var(--red)',    vencidos60)  +
+    seccion('🟠 Por renovar — vencen en ≤ 60 días', 'var(--orange)', proximos60) +
+    seccion('🟢 Vigentes', 'var(--green)', masAdelante);
 }
 
 // ══════════════════════════════════════════════
