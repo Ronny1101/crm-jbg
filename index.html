@@ -1347,66 +1347,78 @@ function changePagCt(d) { ctPage+=d; renderCt(); }
 // ══════════════════════════════════════════════
 // ALERTAS
 // ══════════════════════════════════════════════
+var _alertaFiltro = 'proximos'; // 'vencidos' | 'proximos' | 'vigentes'
+
 function renderAlertas() {
   var data = getData();
   var hoy  = new Date(); hoy.setHours(0,0,0,0);
 
-  var vigente = data.filter(function(r){ return r.es==='Vigente'; }).length;
-  var vencido = data.filter(function(r){ return r.es==='Vencido'; }).length;
-  var renovar = data.filter(function(r){
-    if(!r.fv) return false;
-    var d = (new Date(r.fv) - hoy) / 86400000;
-    return d >= 0 && d <= 60;
-  }).length;
+  var conFecha  = data.filter(function(r){ return r.fv; });
+  var gVencidos = conFecha.filter(function(r){ return (new Date(r.fv)-hoy)/86400000 < 0; });
+  var gProximos = conFecha.filter(function(r){ var d=(new Date(r.fv)-hoy)/86400000; return d>=0 && d<=60; });
+  var gVigentes = conFecha.filter(function(r){ return (new Date(r.fv)-hoy)/86400000 > 60; });
+
+  // KPI cards clickeables — resaltar el activo
+  function kpiCard(filtro, color, label, count, sub) {
+    var activo = _alertaFiltro === filtro;
+    var borde  = activo ? '2px solid '+color : '1px solid var(--border)';
+    var fondo  = activo ? color+'22' : 'var(--surface)';
+    return '<div class="kpi-card" onclick="setAlertaFiltro(\''+filtro+'\')" style="cursor:pointer;--card-color:'+color+';background:'+fondo+';border:'+borde+';transition:all .2s">'
+      + '<div class="kpi-label">'+label+'</div>'
+      + '<div class="kpi-val">'+count+'</div>'
+      + (sub ? '<div class="kpi-sub">'+sub+'</div>' : '')
+      + '</div>';
+  }
 
   document.getElementById('alerta-kpis').innerHTML =
-    '<div class="kpi-card" style="--card-color:var(--orange)"><div class="kpi-label">Por Renovar</div><div class="kpi-val">'+renovar+'</div><div class="kpi-sub">vencen en \u2264 60 d\u00edas</div></div>' +
-    '<div class="kpi-card" style="--card-color:var(--red)"><div class="kpi-label">Vencidos activos</div><div class="kpi-val">'+vencido+'</div></div>' +
-    '<div class="kpi-card" style="--card-color:var(--green)"><div class="kpi-label">Vigentes</div><div class="kpi-val">'+vigente+'</div></div>';
+    kpiCard('proximos', 'var(--orange)', 'Por Renovar',     gProximos.length, 'vencen en \u2264 60 d\u00edas') +
+    kpiCard('vencidos', 'var(--red)',    'Vencidos activos', gVencidos.length, '') +
+    kpiCard('vigentes', 'var(--green)',  'Vigentes',         gVigentes.length, 'vencen en > 60 d\u00edas');
 
+  renderAlertaLista(gVencidos, gProximos, gVigentes, hoy);
+}
+
+function setAlertaFiltro(f) {
+  _alertaFiltro = f;
+  // Re-render solo los KPIs y lista (sin recargar datos)
+  renderAlertas();
+}
+
+function renderAlertaLista(gVencidos, gProximos, gVigentes, hoy) {
   var list = document.getElementById('alert-list');
-  var conFecha = data.filter(function(r){ return r.fv; })
-                     .sort(function(a,b){ return new Date(a.fv)-new Date(b.fv); });
 
-  if (!conFecha.length) {
-    list.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted)">Sin contratos con fecha de vencimiento.</div>';
+  var arr = _alertaFiltro === 'vencidos' ? gVencidos
+          : _alertaFiltro === 'vigentes' ? gVigentes
+          : gProximos;
+
+  arr = arr.slice().sort(function(a,b){ return new Date(a.fv)-new Date(b.fv); });
+
+  if (!arr.length) {
+    list.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted);font-size:13px">No hay contratos en esta categoría.</div>';
     return;
   }
 
-  var html = '';
+  var col0 = _alertaFiltro === 'vencidos' ? 'var(--red)' : _alertaFiltro === 'vigentes' ? 'var(--green)' : 'var(--orange)';
+  var tit  = _alertaFiltro === 'vencidos' ? 'Vencidos activos'
+           : _alertaFiltro === 'vigentes' ? 'Vigentes'
+           : 'Por renovar \u2014 vencen en \u2264 60 d\u00edas';
 
-  // Cabecera de sección
-  function cab(titulo, color, n) {
-    return '<div style="font-size:11px;font-weight:700;color:'+color+';text-transform:uppercase;letter-spacing:.5px;padding:12px 16px 4px;border-bottom:1px solid var(--border)">'+titulo+' ('+n+')</div>';
+  var html = '<div style="font-size:11px;font-weight:700;color:'+col0+';text-transform:uppercase;letter-spacing:.5px;padding:12px 16px 6px;border-bottom:1px solid var(--border)">'+tit+' ('+arr.length+')</div>';
+
+  for (var i=0; i<arr.length; i++) {
+    var r    = arr[i];
+    var diff = Math.round((new Date(r.fv) - hoy) / 86400000);
+    var col  = diff < 0 ? 'var(--red)' : diff <= 15 ? 'var(--red)' : diff <= 60 ? 'var(--orange)' : 'var(--green)';
+    var lbl  = diff < 0 ? 'Vencido hace '+Math.abs(diff)+' d\u00edas' : diff === 0 ? 'Vence hoy' : diff+' d\u00edas';
+    html += '<div class="alert-item" onclick="openModal('+r.ref+')">'
+          + '<div class="alert-dot" style="background:'+col+'"></div>'
+          + '<div class="alert-info">'
+          + '<div class="alert-main">'+(r.ar||'Sin arrendatario')+' \u00b7 '+r.e+'</div>'
+          + '<div class="alert-sub">Ref #'+r.ref+' \u00b7 '+r.tb+' \u00b7 '+fmtA(r.a)+' \u00b7 '+fmt(r.cm)+'/mes \u00b7 Vence: '+r.fv+'</div>'
+          + '</div>'
+          + '<div class="alert-days" style="color:'+col+';white-space:nowrap">'+lbl+'</div>'
+          + '</div>';
   }
-
-  // Grupos
-  var gVencidos  = conFecha.filter(function(r){ return (new Date(r.fv)-hoy)/86400000 <  0; });
-  var gProximos  = conFecha.filter(function(r){ var d=(new Date(r.fv)-hoy)/86400000; return d>=0 && d<=60; });
-  var gVigentes  = conFecha.filter(function(r){ return (new Date(r.fv)-hoy)/86400000 >  60; });
-
-  function filas(arr) {
-    var out = '';
-    for (var i=0; i<arr.length; i++) {
-      var r    = arr[i];
-      var diff = Math.round((new Date(r.fv) - hoy) / 86400000);
-      var col  = diff < 0 ? 'var(--red)' : diff <= 15 ? 'var(--red)' : diff <= 60 ? 'var(--orange)' : 'var(--green)';
-      var lbl  = diff < 0 ? 'Vencido hace '+Math.abs(diff)+' d' : diff === 0 ? 'Vence hoy' : diff+' d\u00edas';
-      out += '<div class="alert-item" onclick="openModal('+r.ref+')">'
-           + '<div class="alert-dot" style="background:'+col+'"></div>'
-           + '<div class="alert-info">'
-           + '<div class="alert-main">'+(r.ar||'Sin arrendatario')+' \u00b7 '+r.e+'</div>'
-           + '<div class="alert-sub">Ref #'+r.ref+' \u00b7 '+r.tb+' \u00b7 '+fmtA(r.a)+' \u00b7 '+fmt(r.cm)+'/mes \u00b7 Vence: '+r.fv+'</div>'
-           + '</div>'
-           + '<div class="alert-days" style="color:'+col+';white-space:nowrap">'+lbl+'</div>'
-           + '</div>';
-    }
-    return out;
-  }
-
-  if (gVencidos.length)  html += cab('Vencidos activos',              'var(--red)',    gVencidos.length)  + filas(gVencidos);
-  if (gProximos.length)  html += cab('Por renovar \u2014 \u2264 60 d\u00edas', 'var(--orange)', gProximos.length)  + filas(gProximos);
-  if (gVigentes.length)  html += cab('Vigentes',                      'var(--green)',  gVigentes.length)  + filas(gVigentes);
 
   list.innerHTML = html;
 }
