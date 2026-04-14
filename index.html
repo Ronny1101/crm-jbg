@@ -681,28 +681,6 @@ document.addEventListener('DOMContentLoaded', function() {
         </div>
       </div>
 
-      <!-- Modal fechas contrato renovado -->
-      <div id="modal-fechas-renov" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:2000;align-items:center;justify-content:center" onclick="if(event.target===this)closeContractDatesModal()">
-        <div style="background:var(--surface);border:1px solid var(--accent);border-radius:16px;padding:28px;width:460px;max-width:95vw;box-shadow:0 8px 40px #000a">
-          <div style="font-size:15px;font-weight:700;color:var(--accent);margin-bottom:4px">📋 Fechas del contrato renovado</div>
-          <div id="modal-fechas-arren" style="font-size:12px;color:var(--muted);margin-bottom:20px;line-height:1.5"></div>
-          <div style="display:flex;flex-direction:column;gap:14px;margin-bottom:20px">
-            <div>
-              <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:4px">Fecha inicio nuevo contrato</label>
-              <input class="m-input" type="date" id="mfr-inicio" style="width:100%;box-sizing:border-box">
-            </div>
-            <div>
-              <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:4px">Fecha fin nuevo contrato</label>
-              <input class="m-input" type="date" id="mfr-fin" style="width:100%;box-sizing:border-box">
-            </div>
-          </div>
-          <div style="display:flex;gap:8px;justify-content:flex-end">
-            <button class="btn-cancel" onclick="closeContractDatesModal()">Cancelar</button>
-            <button class="btn-save" onclick="saveContractDates()">Guardar fechas</button>
-          </div>
-        </div>
-      </div>
-
       <!-- Filtros -->
       <div class="table-card">
         <div class="toolbar">
@@ -2346,26 +2324,26 @@ function renderRenovaciones() {
     ).join('');
 
     return `
-    <div class="rn-card">
+    <div class="rn-card" onclick="openContractDatesModal('${r.id}')" style="cursor:pointer">
       <div style="flex:1;min-width:0">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap">
           <div style="font-size:14px;font-weight:600">${r.arren}</div>
           <span class="rn-etapa-pill" style="background:${etapa.color}22;color:${etapa.color}">${etapa.label}</span>
           ${diasLabel}
           ${r.resp?`<span style="font-size:11px;color:var(--muted)">· ${r.resp}</span>`:''}
+          <span style="font-size:10px;color:var(--accent);opacity:0.7;margin-left:auto">📋 clic para editar fechas</span>
         </div>
         <div style="font-size:12px;color:var(--muted);margin-bottom:8px">${r.bien}${r.vence?` · Vence: ${r.vence}`:''}</div>
         <div class="rn-prog">${dots}</div>
         ${r.nota?`<div style="font-size:11px;color:var(--muted);margin-top:6px;font-style:italic">${r.nota}</div>`:''}
         ${(r.fecha_inicio_nuevo||r.fecha_fin_nuevo)?`<div style="display:flex;gap:12px;margin-top:8px;padding:6px 10px;background:var(--green)15;border:1px solid var(--green)40;border-radius:8px;flex-wrap:wrap">
-          ${r.fecha_inicio_nuevo?`<span style="font-size:11px;color:var(--green);font-weight:600">Inicio nuevo: ${r.fecha_inicio_nuevo}</span>`:''}
-          ${r.fecha_fin_nuevo?`<span style="font-size:11px;color:var(--green);font-weight:600">Fin nuevo: ${r.fecha_fin_nuevo}</span>`:''}
+          ${r.fecha_inicio_nuevo?`<span style="font-size:11px;color:var(--green);font-weight:600">📅 Inicio: ${r.fecha_inicio_nuevo}</span>`:''}
+          ${r.fecha_fin_nuevo?`<span style="font-size:11px;color:var(--green);font-weight:600">📅 Fin: ${r.fecha_fin_nuevo}</span>`:''}
         </div>`:''}
         ${historial?`<div style="margin-top:6px">${historial}</div>`:''}
       </div>
-      <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0;align-items:flex-end">
+      <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0;align-items:flex-end" onclick="event.stopPropagation()">
         ${!isLast?`<button onclick="avanzarEtapa('${r.id}','${r.etapa}')" style="background:var(--accent);color:#0f0f13;border:none;padding:5px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap">→ Avanzar</button>`:'<span style="font-size:11px;color:var(--green);font-weight:600">✓ Completado</span>'}
-        <button onclick="openContractDatesModal('${r.id}')" style="background:var(--accent)22;color:var(--accent);border:1px solid var(--accent)55;padding:5px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap">📋 Fechas contrato</button>
         ${etapaIdx>0?`<button onclick="retrocederEtapa('${r.id}','${r.etapa}')" style="background:none;border:1px solid var(--border);color:var(--muted);padding:4px 10px;border-radius:6px;font-size:11px;cursor:pointer">← Retroceder</button>`:''}
         <div style="display:flex;gap:4px">
           <button onclick="openEditRenov(${JSON.stringify(r).replace(/"/g,'&quot;')})" style="background:none;border:1px solid var(--border);color:var(--muted);padding:4px 8px;border-radius:6px;font-size:11px;cursor:pointer">✏</button>
@@ -2386,5 +2364,25 @@ function renderRenovaciones() {
   }
 })();
 </script>
+
+<!-- Modal fechas contrato renovado — fuera de cualquier page para que position:fixed funcione -->
+<div id="modal-fechas-renov" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.78);z-index:9999;align-items:center;justify-content:center" onclick="if(event.target===this)closeContractDatesModal()">
+  <div style="background:#1a1a24;border:1px solid var(--accent);border-radius:16px;padding:28px;width:420px;max-width:92vw;box-shadow:0 8px 40px #000c">
+    <div style="font-size:15px;font-weight:700;color:var(--accent);margin-bottom:6px">📋 Fechas del nuevo contrato</div>
+    <div id="modal-fechas-arren" style="font-size:12px;color:#aaa;margin-bottom:22px;line-height:1.6"></div>
+    <div style="margin-bottom:16px">
+      <label style="font-size:11px;color:#aaa;display:block;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">Fecha inicio nuevo contrato</label>
+      <input type="date" id="mfr-inicio" style="width:100%;box-sizing:border-box;background:#0f0f18;border:1px solid #333;border-radius:8px;color:#fff;padding:9px 12px;font-size:13px;outline:none">
+    </div>
+    <div style="margin-bottom:24px">
+      <label style="font-size:11px;color:#aaa;display:block;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">Fecha fin nuevo contrato</label>
+      <input type="date" id="mfr-fin" style="width:100%;box-sizing:border-box;background:#0f0f18;border:1px solid #333;border-radius:8px;color:#fff;padding:9px 12px;font-size:13px;outline:none">
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end">
+      <button onclick="closeContractDatesModal()" style="background:none;border:1px solid #444;color:#aaa;padding:8px 18px;border-radius:8px;font-size:13px;cursor:pointer">Cancelar</button>
+      <button onclick="saveContractDates()" style="background:#c8f135;color:#0f0f13;border:none;padding:8px 20px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">Guardar fechas</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
