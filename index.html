@@ -234,6 +234,17 @@ tbody td{padding:9px 14px;font-size:13px;white-space:nowrap;}
 .pol-hist-item.vigente{border-left-color:var(--green);}
 .pol-hist-item.vencer{border-left-color:var(--orange);}
 .pol-hist-item.vencida{border-left-color:var(--border);}
+.etapa-badge{display:flex;align-items:center;gap:6px;padding:6px 10px;background:rgba(255,255,255,0.04);border-radius:6px;font-size:11px;color:var(--text);white-space:nowrap;position:relative;}
+.etapa-badge::after{content:'→';color:var(--muted);font-size:10px;margin-left:4px;}
+.etapa-badge:last-child::after{display:none;}
+.etapa-dot{width:8px;height:8px;border-radius:50%;background:var(--ec,var(--accent));flex-shrink:0;}
+.rn-card{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px 16px;display:flex;align-items:flex-start;gap:14px;}
+.rn-card:hover{border-color:var(--accent);}
+.rn-etapa-pill{font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;background:rgba(94,143,212,0.15);color:var(--accent);white-space:nowrap;flex-shrink:0;}
+.rn-prog{display:flex;gap:3px;margin-top:8px;}
+.rn-prog-dot{width:16px;height:4px;border-radius:2px;background:var(--border);}
+.rn-prog-dot.done{background:var(--accent);}
+.rn-prog-dot.active{background:var(--accent2);}
 .no-data{text-align:center;padding:24px;color:var(--muted);font-size:13px;background:var(--surface2);border-radius:8px;}
 </style>
 </head>
@@ -362,6 +373,10 @@ document.addEventListener('DOMContentLoaded', function() {
       <div class="nav-item" id="n-usuarios" onclick="showPage('usuarios')" style="display:none">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
         <span>Usuarios</span>
+      </div>
+      <div class="nav-item" id="n-renovaciones" onclick="showPage('renovaciones')" style="display:none">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+        <span>Renovaciones</span>
       </div>
       <div class="nav-section">Financiero</div>
       <div class="nav-item" id="n-garantias" onclick="showPage('garantias')">
@@ -571,6 +586,119 @@ document.addEventListener('DOMContentLoaded', function() {
       </div>
     </div>
 
+
+    <!-- RENOVACIONES (solo admin) -->
+    <div class="page" id="page-renovaciones">
+      <div class="page-header" style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div>
+          <div class="page-title">Renovaciones de contratos</div>
+          <div class="page-sub">Seguimiento del flujo de renovación por arrendatario</div>
+        </div>
+        <button class="btn-save" onclick="showAddRenovacion()">+ Agregar renovación</button>
+      </div>
+
+      <!-- Flujo visual -->
+      <div style="background:var(--surface2);border-radius:12px;padding:16px 20px;margin-bottom:20px;overflow-x:auto">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:10px;font-weight:600">FLUJO DE RENOVACIÓN</div>
+        <div style="display:flex;align-items:center;gap:0;min-width:900px">
+          
+        <div class="etapa-badge" data-etapa="docusign" style="--ec:#5e8fd4">
+          <div class="etapa-dot"></div>
+          <span>DocuSign enviado</span>
+        </div>
+        <div class="etapa-badge" data-etapa="cumplimiento" style="--ec:#a78bfa">
+          <div class="etapa-dot"></div>
+          <span>Firmas cumplimiento</span>
+        </div>
+        <div class="etapa-badge" data-etapa="documentacion" style="--ec:#f59e0b">
+          <div class="etapa-dot"></div>
+          <span>Documentación lista</span>
+        </div>
+        <div class="etapa-badge" data-etapa="gerencia" style="--ec:#fb923c">
+          <div class="etapa-dot"></div>
+          <span>Revisión gerencia/auditoría</span>
+        </div>
+        <div class="etapa-badge" data-etapa="condiciones" style="--ec:#34d399">
+          <div class="etapa-dot"></div>
+          <span>Condiciones aprobadas</span>
+        </div>
+        <div class="etapa-badge" data-etapa="elaboracion" style="--ec:#60a5fa">
+          <div class="etapa-dot"></div>
+          <span>Elaboración contrato</span>
+        </div>
+        <div class="etapa-badge" data-etapa="firma_ds" style="--ec:#818cf8">
+          <div class="etapa-dot"></div>
+          <span>Firmas DocuSign listas</span>
+        </div>
+        <div class="etapa-badge" data-etapa="firma_arren" style="--ec:#f472b6">
+          <div class="etapa-dot"></div>
+          <span>Firma arrendatario</span>
+        </div>
+        <div class="etapa-badge" data-etapa="firma_jbg" style="--ec:#94a3b8">
+          <div class="etapa-dot"></div>
+          <span>Firma JBG</span>
+        </div>
+        <div class="etapa-badge" data-etapa="notariado" style="--ec:#4ade80">
+          <div class="etapa-dot"></div>
+          <span>Notarizado</span>
+        </div>
+        </div>
+      </div>
+
+      <!-- Panel agregar renovación -->
+      <div id="add-renov-panel" style="display:none;background:var(--surface2);border:1px solid var(--accent);border-radius:12px;padding:20px;margin-bottom:20px">
+        <div style="font-size:14px;font-weight:600;color:var(--accent);margin-bottom:14px">Nueva renovación</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px">
+          <div>
+            <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:4px">Arrendatario</label>
+            <input class="m-input" id="rn-arren" placeholder="Nombre del arrendatario" list="rn-arren-list" style="width:100%">
+            <datalist id="rn-arren-list"></datalist>
+          </div>
+          <div>
+            <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:4px">Bien / Estructura</label>
+            <input class="m-input" id="rn-bien" placeholder="Ej: GARZOCENTRO - Local 202" style="width:100%">
+          </div>
+          <div>
+            <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:4px">Vencimiento contrato</label>
+            <input class="m-input" type="date" id="rn-vence" style="width:100%">
+          </div>
+          <div>
+            <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:4px">Etapa inicial</label>
+            <select class="m-select" id="rn-etapa" style="width:100%"><option value="docusign">DocuSign enviado</option><option value="cumplimiento">Firmas cumplimiento</option><option value="documentacion">Documentación lista</option><option value="gerencia">Revisión gerencia/auditoría</option><option value="condiciones">Condiciones aprobadas</option><option value="elaboracion">Elaboración contrato</option><option value="firma_ds">Firmas DocuSign listas</option><option value="firma_arren">Firma arrendatario</option><option value="firma_jbg">Firma JBG</option><option value="notariado">Notarizado</option></select>
+          </div>
+          <div>
+            <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:4px">Responsable</label>
+            <input class="m-input" id="rn-resp" placeholder="Ej: Gaby, Noemí..." style="width:100%">
+          </div>
+          <div>
+            <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:4px">Nota</label>
+            <input class="m-input" id="rn-nota" placeholder="Observación opcional" style="width:100%">
+          </div>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="btn-save" onclick="saveRenovacion()">Guardar</button>
+          <button class="btn-cancel" onclick="hideAddRenovacion()">Cancelar</button>
+        </div>
+      </div>
+
+      <!-- Filtros -->
+      <div class="table-card">
+        <div class="toolbar">
+          <div class="search-box">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input id="rn-search" placeholder="Buscar arrendatario..." oninput="renderRenovaciones()">
+          </div>
+          <select class="flt" id="rn-filter-etapa" onchange="renderRenovaciones()">
+            <option value="">Todas las etapas</option>
+            <option value="docusign">DocuSign enviado</option><option value="cumplimiento">Firmas cumplimiento</option><option value="documentacion">Documentación lista</option><option value="gerencia">Revisión gerencia/auditoría</option><option value="condiciones">Condiciones aprobadas</option><option value="elaboracion">Elaboración contrato</option><option value="firma_ds">Firmas DocuSign listas</option><option value="firma_arren">Firma arrendatario</option><option value="firma_jbg">Firma JBG</option><option value="notariado">Notarizado</option>
+          </select>
+          <span class="tcount" id="rn-count">–</span>
+        </div>
+
+        <!-- Kanban / Lista -->
+        <div id="rn-list" style="display:flex;flex-direction:column;gap:8px;padding:12px"></div>
+      </div>
+    </div>
     <!-- GARANTIAS -->
     <div class="page" id="page-garantias">
       <div class="page-header">
@@ -866,6 +994,9 @@ async function startApp() {
   if (isAdmin()) {
     const navUsr = document.getElementById('n-usuarios');
     if (navUsr) navUsr.style.display = 'flex';
+    const navRen = document.getElementById('n-renovaciones');
+    if (navRen) navRen.style.display = 'flex';
+    subscribeRenovaciones();
   }
   // Render user info
   const u = currentUser;
@@ -1066,6 +1197,7 @@ function showPage(id) {
   if (id==='garantias') { renderGarKPIs(); filterGar(); }
   if (id==='polizas') { renderPolKPIs(); filterPol(); }
   if (id==='usuarios') { renderUsuariosPage(); }
+  if (id==='renovaciones') { renderRenovaciones(); }
 }
 
 // ══════════════════════════════════════════════
@@ -1842,7 +1974,8 @@ async function createUser() {
   const name  = document.getElementById('new-user-name').value.trim();
   const rol   = document.getElementById('new-user-rol').value;
   const errEl = document.getElementById('create-user-error');
-  
+  errEl.style.display = 'none';
+
   if (!email || !pass || !name) {
     errEl.textContent = 'Completa todos los campos.';
     errEl.style.display = 'block';
@@ -1859,73 +1992,289 @@ async function createUser() {
   const reset = () => { if(btn){ btn.textContent='Crear usuario'; btn.disabled=false; } };
 
   try {
-    // Create user with Firebase Auth via API
-    // We use a secondary auth instance to avoid logging out current admin
-    const cfg = {
-      apiKey: "AIzaSyD29xjSU51ea-nAXrdFd9BAHlrO0tKSaGo",
-      authDomain: "crm-inmobiliario-jbg.firebaseapp.com",
-      projectId: "crm-inmobiliario-jbg",
-      storageBucket: "crm-inmobiliario-jbg.firebasestorage.app",
-      messagingSenderId: "348772550546",
-      appId: "1:348772550546:web:cf3b39785ef2decfd2a34b"
-    };
-    
-    // Use REST API to create user without affecting current session
-    const resp = await fetch(
-      `https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${cfg.apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password: pass, returnSecureToken: true })
-      }
-    );
-    const result = await resp.json();
-    
-    if (result.error) {
-      let msg = result.error.message;
-      if (msg === 'EMAIL_EXISTS') msg = 'Ese correo ya está registrado.';
-      if (msg === 'WEAK_PASSWORD : Password should be at least 6 characters') msg = 'Contraseña muy corta (mínimo 6 caracteres).';
-      errEl.textContent = msg;
-      errEl.style.display = 'block';
-      reset();
-      return;
+    // Save the current admin session token to restore after
+    const adminUser = firebase.auth().currentUser;
+    const adminToken = await adminUser.getIdToken();
+
+    // Create secondary app to register new user without losing admin session
+    let secondaryApp;
+    try {
+      secondaryApp = firebase.app('secondary');
+    } catch(e) {
+      secondaryApp = firebase.initializeApp({
+        apiKey: "AIzaSyD29xjSU51ea-nAXrdFd9BAHlrO0tKSaGo",
+        authDomain: "crm-inmobiliario-jbg.firebaseapp.com",
+        projectId: "crm-inmobiliario-jbg",
+        storageBucket: "crm-inmobiliario-jbg.firebasestorage.app",
+        messagingSenderId: "348772550546",
+        appId: "1:348772550546:web:cf3b39785ef2decfd2a34b"
+      }, 'secondary');
     }
 
-    const uid = result.localId;
-    
-    // Save role in Firestore
+    const secondaryAuth = firebase.auth(secondaryApp);
+    const cred = await secondaryAuth.createUserWithEmailAndPassword(email, pass);
+    const uid = cred.user.uid;
+
+    // Update display name on new user
+    await cred.user.updateProfile({ displayName: name });
+
+    // Sign out of secondary app immediately
+    await secondaryAuth.signOut();
+
+    // Save role in Firestore using main db
     await db.collection('user_roles').doc(uid).set({
       email: email,
       name: name,
       photo: '',
       role: rol,
-      lastAccess: Date.now(),
+      lastAccess: 0,
       disabled: false,
     });
-    
+
     // Update local cache
-    userRolesCache[uid] = { email, name, role: rol, lastAccess: Date.now(), disabled: false };
-    
-    toast('Usuario creado', `${name} (${email}) registrado como ${rol === 'admin' ? 'Admin' : 'Visor'}.`, 'success');
+    userRolesCache[uid] = { email, name, role: rol, lastAccess: 0, disabled: false };
+
+    toast('Usuario creado', `${name} registrado como ${rol === 'admin' ? 'Admin' : 'Visor'}. Contraseña: ${pass}`, 'success');
     hideCreateUser();
     renderUsuariosPage();
     reset();
-    
+
     // Log activity
-    await db.collection('activity').add({
-      ts: Date.now(), ref: 0,
-      msg: `Nuevo usuario creado: ${email} (${rol})`,
-      userId: currentUser.uid,
-      userName: currentUser.displayName || currentUser.email.split('@')[0],
-      photo: currentUser.photoURL || '',
-      type: 'admin'
-    });
+    try {
+      await db.collection('activity').add({
+        ts: Date.now(), ref: 0,
+        msg: `Nuevo usuario creado: ${email} (${rol})`,
+        userId: currentUser.uid,
+        userName: currentUser.displayName || currentUser.email.split('@')[0],
+        photo: currentUser.photoURL || '',
+        type: 'admin'
+      });
+    } catch(e) {}
 
   } catch(e) {
-    errEl.textContent = 'Error: ' + e.message;
+    let msg = e.message;
+    if (e.code === 'auth/email-already-in-use') msg = 'Ese correo ya está registrado en Firebase.';
+    if (e.code === 'auth/weak-password') msg = 'Contraseña muy débil (mínimo 6 caracteres).';
+    if (e.code === 'auth/invalid-email') msg = 'Correo electrónico inválido.';
+    errEl.textContent = msg;
     errEl.style.display = 'block';
     reset();
   }
+}
+
+
+// ══════════════════════════════════════════════
+// RENOVACIONES
+// ══════════════════════════════════════════════
+const ETAPAS = [
+  {id:'docusign',     label:'DocuSign enviado',           color:'#5e8fd4'},
+  {id:'cumplimiento', label:'Firmas cumplimiento',         color:'#a78bfa'},
+  {id:'documentacion',label:'Documentación lista',         color:'#f59e0b'},
+  {id:'gerencia',     label:'Revisión gerencia/auditoría', color:'#fb923c'},
+  {id:'condiciones',  label:'Condiciones aprobadas',       color:'#34d399'},
+  {id:'elaboracion',  label:'Elaboración contrato',        color:'#60a5fa'},
+  {id:'firma_ds',     label:'Firmas DocuSign listas',      color:'#818cf8'},
+  {id:'firma_arren',  label:'Firma arrendatario',          color:'#f472b6'},
+  {id:'firma_jbg',    label:'Firma JBG',                   color:'#94a3b8'},
+  {id:'notariado',    label:'Notarizado ✓',                color:'#4ade80'},
+];
+
+var renovCache = [];
+var unsubRenov = null;
+
+function subscribeRenovaciones() {
+  if (!db) return;
+  if (unsubRenov) unsubRenov();
+  unsubRenov = db.collection('renovaciones')
+    .orderBy('ts', 'desc')
+    .onSnapshot(snap => {
+      renovCache = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      if (document.getElementById('page-renovaciones')?.classList.contains('active')) {
+        renderRenovaciones();
+      }
+    }, e => console.warn('renovaciones:', e));
+}
+
+function showAddRenovacion() {
+  const panel = document.getElementById('add-renov-panel');
+  panel.style.display = 'block';
+  // Populate arrendatarios datalist
+  const dl = document.getElementById('rn-arren-list');
+  const data = getData();
+  const arrs = [...new Set(data.filter(r=>r.ar).map(r=>r.ar))].sort();
+  dl.innerHTML = arrs.map(a=>`<option value="${a}">`).join('');
+  // Auto-fill bien when arrendatario selected
+  document.getElementById('rn-arren').oninput = function() {
+    const ar = this.value.trim().toUpperCase();
+    const match = data.find(r => r.ar && r.ar.toUpperCase() === ar);
+    if (match) {
+      document.getElementById('rn-bien').value = `${match.e} - ${match.tb} ${match.ib}`;
+      if (match.fv) document.getElementById('rn-vence').value = match.fv.slice(0,10);
+    }
+  };
+  panel.scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+
+function hideAddRenovacion() {
+  document.getElementById('add-renov-panel').style.display = 'none';
+}
+
+async function saveRenovacion(editId) {
+  const arren = document.getElementById('rn-arren').value.trim();
+  const bien  = document.getElementById('rn-bien').value.trim();
+  const vence = document.getElementById('rn-vence').value;
+  const etapa = document.getElementById('rn-etapa').value;
+  const resp  = document.getElementById('rn-resp').value.trim();
+  const nota  = document.getElementById('rn-nota').value.trim();
+
+  if (!arren || !bien) { toast('Error', 'Completa arrendatario y bien.', 'error'); return; }
+
+  const doc = {
+    arren, bien, vence, etapa, resp, nota,
+    ts: Date.now(),
+    creadoPor: currentUser.email,
+    historial: [{ etapa, fecha: new Date().toISOString().slice(0,10), user: currentUser.email }],
+  };
+
+  try {
+    if (editId) {
+      const existing = renovCache.find(r=>r.id===editId);
+      const historial = existing?.historial || [];
+      if (!historial.find(h=>h.etapa===etapa)) {
+        historial.push({ etapa, fecha: new Date().toISOString().slice(0,10), user: currentUser.email });
+      }
+      await db.collection('renovaciones').doc(editId).update({ arren, bien, vence, etapa, resp, nota, historial });
+      toast('Renovación actualizada', '', 'success');
+    } else {
+      await db.collection('renovaciones').add(doc);
+      toast('Renovación creada', arren, 'success');
+    }
+    hideAddRenovacion();
+    document.getElementById('rn-arren').value = '';
+    document.getElementById('rn-bien').value = '';
+    document.getElementById('rn-vence').value = '';
+    document.getElementById('rn-nota').value = '';
+    document.getElementById('rn-resp').value = '';
+  } catch(e) { toast('Error', e.message, 'error'); }
+}
+
+async function avanzarEtapa(id, currentEtapaId) {
+  if (!isAdmin()) return;
+  const idx = ETAPAS.findIndex(e=>e.id===currentEtapaId);
+  if (idx === ETAPAS.length-1) { toast('Ya está en la etapa final', '', 'info'); return; }
+  const nextEtapa = ETAPAS[idx+1];
+  try {
+    const existing = renovCache.find(r=>r.id===id);
+    const historial = existing?.historial || [];
+    historial.push({ etapa: nextEtapa.id, fecha: new Date().toISOString().slice(0,10), user: currentUser.email });
+    await db.collection('renovaciones').doc(id).update({
+      etapa: nextEtapa.id,
+      historial,
+    });
+    toast('Etapa avanzada', nextEtapa.label, 'success');
+  } catch(e) { toast('Error', e.message, 'error'); }
+}
+
+async function retrocederEtapa(id, currentEtapaId) {
+  if (!isAdmin()) return;
+  const idx = ETAPAS.findIndex(e=>e.id===currentEtapaId);
+  if (idx === 0) return;
+  const prevEtapa = ETAPAS[idx-1];
+  try {
+    await db.collection('renovaciones').doc(id).update({ etapa: prevEtapa.id });
+    toast('Etapa retrocedida', prevEtapa.label, 'info');
+  } catch(e) { toast('Error', e.message, 'error'); }
+}
+
+async function deleteRenovacion(id) {
+  if (!isAdmin()) return;
+  if (!confirm('¿Eliminar esta renovación?')) return;
+  try {
+    await db.collection('renovaciones').doc(id).delete();
+    toast('Renovación eliminada', '', 'info');
+  } catch(e) { toast('Error', e.message, 'error'); }
+}
+
+function openEditRenov(r) {
+  showAddRenovacion();
+  document.getElementById('rn-arren').value = r.arren;
+  document.getElementById('rn-bien').value  = r.bien;
+  document.getElementById('rn-vence').value = r.vence || '';
+  document.getElementById('rn-etapa').value = r.etapa;
+  document.getElementById('rn-resp').value  = r.resp || '';
+  document.getElementById('rn-nota').value  = r.nota || '';
+  // Change save button to update
+  const btn = document.querySelector('#add-renov-panel .btn-save');
+  if (btn) { btn.textContent = 'Actualizar'; btn.onclick = ()=>saveRenovacion(r.id); }
+}
+
+function renderRenovaciones() {
+  const s = (document.getElementById('rn-search')?.value||'').toLowerCase();
+  const fe = document.getElementById('rn-filter-etapa')?.value||'';
+  
+  let filtered = renovCache.filter(r => {
+    if (fe && r.etapa !== fe) return false;
+    if (s && !(r.arren||'').toLowerCase().includes(s) && !(r.bien||'').toLowerCase().includes(s)) return false;
+    return true;
+  });
+
+  document.getElementById('rn-count').textContent = filtered.length + ' renovaciones';
+
+  const container = document.getElementById('rn-list');
+  if (!container) return;
+
+  if (!filtered.length) {
+    container.innerHTML = '<div class="no-data">No hay renovaciones registradas. Usa "+ Agregar renovación" para comenzar.</div>';
+    return;
+  }
+
+  container.innerHTML = filtered.map(r => {
+    const etapa = ETAPAS.find(e=>e.id===r.etapa) || ETAPAS[0];
+    const etapaIdx = ETAPAS.findIndex(e=>e.id===r.etapa);
+    const isLast = etapaIdx === ETAPAS.length-1;
+    
+    // Progress dots
+    const dots = ETAPAS.map((e,i) => 
+      `<div class="rn-prog-dot ${i<etapaIdx?'done':i===etapaIdx?'active':''}" title="${e.label}"></div>`
+    ).join('');
+
+    // Days until expiry
+    let diasLabel = '';
+    if (r.vence) {
+      const dias = Math.round((new Date(r.vence) - new Date()) / 86400000);
+      const color = dias < 0 ? 'var(--red)' : dias < 30 ? 'var(--orange)' : 'var(--green)';
+      diasLabel = `<span style="font-size:11px;color:${color};font-weight:600">${dias < 0 ? 'Vencido' : dias+'d'}</span>`;
+    }
+
+    // Historial tooltip
+    const historial = (r.historial||[]).slice(-3).map(h =>
+      `<div style="font-size:10px;color:var(--muted)">${h.fecha} · ${ETAPAS.find(e=>e.id===h.etapa)?.label||h.etapa}</div>`
+    ).join('');
+
+    return `
+    <div class="rn-card">
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap">
+          <div style="font-size:14px;font-weight:600">${r.arren}</div>
+          <span class="rn-etapa-pill" style="background:${etapa.color}22;color:${etapa.color}">${etapa.label}</span>
+          ${diasLabel}
+          ${r.resp?`<span style="font-size:11px;color:var(--muted)">· ${r.resp}</span>`:''}
+        </div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:8px">${r.bien}${r.vence?` · Vence: ${r.vence}`:''}</div>
+        <div class="rn-prog">${dots}</div>
+        ${r.nota?`<div style="font-size:11px;color:var(--muted);margin-top:6px;font-style:italic">${r.nota}</div>`:''}
+        ${historial?`<div style="margin-top:6px">${historial}</div>`:''}
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0;align-items:flex-end">
+        ${!isLast?`<button onclick="avanzarEtapa('${r.id}','${r.etapa}')" style="background:var(--accent);color:#0f0f13;border:none;padding:5px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap">→ Avanzar</button>`:'<span style="font-size:11px;color:var(--green);font-weight:600">✓ Completado</span>'}
+        ${etapaIdx>0?`<button onclick="retrocederEtapa('${r.id}','${r.etapa}')" style="background:none;border:1px solid var(--border);color:var(--muted);padding:4px 10px;border-radius:6px;font-size:11px;cursor:pointer">← Retroceder</button>`:''}
+        <div style="display:flex;gap:4px">
+          <button onclick="openEditRenov(${JSON.stringify(r).replace(/"/g,'&quot;')})" style="background:none;border:1px solid var(--border);color:var(--muted);padding:4px 8px;border-radius:6px;font-size:11px;cursor:pointer">✏</button>
+          <button onclick="deleteRenovacion('${r.id}')" style="background:none;border:1px solid var(--red);color:var(--red);padding:4px 8px;border-radius:6px;font-size:11px;cursor:pointer">✕</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
 }
 
 (async function boot() {
