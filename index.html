@@ -466,7 +466,7 @@ document.addEventListener('DOMContentLoaded', function() {
     <div class="page" id="page-alertas">
       <div class="page-header">
         <div class="page-title">Alertas de vencimiento</div>
-        <div class="page-sub">Contratos que vencen en los próximos 90 días</div>
+        <div class="page-sub">Contratos que vencen en los próximos 60 días</div>
       </div>
       <div class="kpi-grid" id="alerta-kpis" style="grid-template-columns:repeat(3,1fr);margin-bottom:20px;"></div>
       <div class="alert-list" id="alert-list"></div>
@@ -1210,11 +1210,11 @@ function renderDashboard() {
   const alq = data.filter(r => r.d==='ALQUILADO');
   const libre = data.filter(r => r.d==='LIBRE');
   const canon = alq.reduce((s,r) => s+(r.cm||0), 0);
-  const today = new Date('2026-03-15');
+  const today = new Date(); today.setHours(0,0,0,0);
   const alertCnt = data.filter(r => {
     if (!r.fv) return false;
     const diff = (new Date(r.fv) - today) / 86400000;
-    return diff >= 0 && diff <= 90;
+    return diff >= 0 && diff <= 60;
   }).length;
   document.getElementById('alert-badge').textContent = alertCnt;
   document.getElementById('alert-badge').style.display = alertCnt > 0 ? '' : 'none';
@@ -1222,7 +1222,7 @@ function renderDashboard() {
     <div class="kpi-card" style="--card-color:var(--accent)"><div class="kpi-label">Total unidades</div><div class="kpi-val">${data.length}</div><div class="kpi-sub">18 estructuras</div></div>
     <div class="kpi-card" style="--card-color:var(--accent2)"><div class="kpi-label">Alquiladas</div><div class="kpi-val">${alq.length}</div><div class="kpi-sub">${((alq.length/data.length)*100).toFixed(1)}% ocupación</div></div>
     <div class="kpi-card" style="--card-color:var(--green)"><div class="kpi-label">Canon mensual</div><div class="kpi-val">${fmt(canon)}</div><div class="kpi-sub">${fmt(canon*12)} / año</div></div>
-    <div class="kpi-card" style="--card-color:var(--red)"><div class="kpi-label">Alertas vencimiento</div><div class="kpi-val">${alertCnt}</div><div class="kpi-sub">próximos 90 días</div></div>
+    <div class="kpi-card" style="--card-color:var(--red)"><div class="kpi-label">Alertas vencimiento</div><div class="kpi-val">${alertCnt}</div><div class="kpi-sub">próximos 60 días</div></div>
   `;
   // Disponibilidad chart
   const dc = {};
@@ -1346,19 +1346,25 @@ function changePagCt(d) { ctPage+=d; renderCt(); }
 // ALERTAS
 // ══════════════════════════════════════════════
 function renderAlertas() {
-  const data=getData(), today=new Date('2026-03-15');
+  const data=getData();
+  const today=new Date(); today.setHours(0,0,0,0);
   const vigente=data.filter(r=>r.es==='Vigente').length;
   const vencido=data.filter(r=>r.es==='Vencido').length;
-  const renovar=data.filter(r=>r.es==='Por Renovar').length;
+  // Por renovar = contratos vigentes o por renovar que vencen en los próximos 60 días
+  const renovar=data.filter(r=>{
+    if(!r.fv) return false;
+    const diff=(new Date(r.fv)-today)/86400000;
+    return diff>=0 && diff<=60;
+  }).length;
   document.getElementById('alerta-kpis').innerHTML=`
-    <div class="kpi-card" style="--card-color:var(--orange)"><div class="kpi-label">Por Renovar</div><div class="kpi-val">${renovar}</div></div>
+    <div class="kpi-card" style="--card-color:var(--orange)"><div class="kpi-label">Por Renovar</div><div class="kpi-val">${renovar}</div><div class="kpi-sub">vencen en ≤ 60 días</div></div>
     <div class="kpi-card" style="--card-color:var(--red)"><div class="kpi-label">Vencidos activos</div><div class="kpi-val">${vencido}</div></div>
     <div class="kpi-card" style="--card-color:var(--green)"><div class="kpi-label">Vigentes</div><div class="kpi-val">${vigente}</div></div>
   `;
-  const proximos=data.filter(r=>{ if(!r.fv) return false; const diff=(new Date(r.fv)-today)/86400000; return diff>=0&&diff<=90; })
+  const proximos=data.filter(r=>{ if(!r.fv) return false; const diff=(new Date(r.fv)-today)/86400000; return diff>=0&&diff<=60; })
     .sort((a,b)=>new Date(a.fv)-new Date(b.fv));
   const list=document.getElementById('alert-list');
-  if(!proximos.length){list.innerHTML='<div style="text-align:center;padding:40px;color:var(--muted);font-size:13px">Sin contratos por vencer en 90 días.</div>';return;}
+  if(!proximos.length){list.innerHTML='<div style="text-align:center;padding:40px;color:var(--muted);font-size:13px">Sin contratos por vencer en 60 días.</div>';return;}
   list.innerHTML=proximos.map(r=>{
     const diff=Math.round((new Date(r.fv)-today)/86400000);
     const col=diff<=15?'var(--red)':diff<=30?'var(--orange)':'var(--accent2)';
