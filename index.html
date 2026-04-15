@@ -468,7 +468,7 @@ document.addEventListener('DOMContentLoaded', function() {
         <div class="page-title">Alertas de vencimiento</div>
         <div class="page-sub">Contratos que vencen en los próximos 60 días</div>
       </div>
-      <div class="kpi-grid" id="alerta-kpis" style="grid-template-columns:repeat(3,1fr);margin-bottom:20px;"></div>
+      <div class="kpi-grid" id="alerta-kpis" style="grid-template-columns:repeat(4,1fr);margin-bottom:20px;"></div>
       <div class="table-card">
         <div class="alert-list" id="alert-list" style="padding:8px 0"></div>
       </div>
@@ -1458,12 +1458,26 @@ function renderAlertas() {
   var data = getData();
   var hoy  = new Date(); hoy.setHours(0,0,0,0);
 
-  var conFecha  = data.filter(function(r){ return r.fv; });
-  var gVencidos = conFecha.filter(function(r){ return (new Date(r.fv)-hoy)/86400000 < 0; });
-  var gProximos = conFecha.filter(function(r){ var d=(new Date(r.fv)-hoy)/86400000; return d>=0 && d<=60; });
-  var gVigentes = conFecha.filter(function(r){ return (new Date(r.fv)-hoy)/86400000 > 60; });
+  // Arrendatarios que YA están en proceso de renovación (cualquier etapa)
+  var enRenovSet = new Set(
+    (renovCache||[]).map(function(rv){ return (rv.arren||'').toUpperCase().trim(); })
+  );
 
-  // KPI cards clickeables — resaltar el activo
+  var conFecha  = data.filter(function(r){ return r.fv; });
+
+  // Separar en renovando vs no-renovando
+  var enRenovacion = conFecha.filter(function(r){
+    return r.ar && enRenovSet.has(r.ar.toUpperCase().trim());
+  });
+  var sinRenov = conFecha.filter(function(r){
+    return !r.ar || !enRenovSet.has(r.ar.toUpperCase().trim());
+  });
+
+  var gVencidos = sinRenov.filter(function(r){ return (new Date(r.fv)-hoy)/86400000 < 0; });
+  var gProximos = sinRenov.filter(function(r){ var d=(new Date(r.fv)-hoy)/86400000; return d>=0 && d<=60; });
+  var gVigentes = sinRenov.filter(function(r){ return (new Date(r.fv)-hoy)/86400000 > 60; });
+
+  // KPI cards clickeables
   function kpiCard(filtro, color, label, count, sub) {
     var activo = _alertaFiltro === filtro;
     var borde  = activo ? '2px solid '+color : '1px solid var(--border)';
@@ -1476,37 +1490,39 @@ function renderAlertas() {
   }
 
   document.getElementById('alerta-kpis').innerHTML =
-    kpiCard('proximos', 'var(--orange)', 'Por Renovar',     gProximos.length, 'vencen en \u2264 60 d\u00edas') +
-    kpiCard('vencidos', 'var(--red)',    'Vencidos activos', gVencidos.length, '') +
-    kpiCard('vigentes', 'var(--green)',  'Vigentes',         gVigentes.length, 'vencen en > 60 d\u00edas');
+    kpiCard('proximos',   'var(--orange)', 'Por Renovar',      gProximos.length,    'vencen en \u2264 60 d\u00edas') +
+    kpiCard('vencidos',   'var(--red)',    'Vencidos activos',  gVencidos.length,    '') +
+    kpiCard('vigentes',   'var(--green)',  'Vigentes',          gVigentes.length,    'vencen en > 60 d\u00edas') +
+    kpiCard('renovando',  'var(--accent)', 'En Renovaci\u00f3n', enRenovacion.length, 'gestionados en flujo');
 
-  renderAlertaLista(gVencidos, gProximos, gVigentes, hoy);
+  renderAlertaLista(gVencidos, gProximos, gVigentes, enRenovacion, hoy);
 }
 
 function setAlertaFiltro(f) {
   _alertaFiltro = f;
-  // Re-render solo los KPIs y lista (sin recargar datos)
   renderAlertas();
 }
 
-function renderAlertaLista(gVencidos, gProximos, gVigentes, hoy) {
+function renderAlertaLista(gVencidos, gProximos, gVigentes, enRenovacion, hoy) {
   var list = document.getElementById('alert-list');
 
-  var arr = _alertaFiltro === 'vencidos' ? gVencidos
-          : _alertaFiltro === 'vigentes' ? gVigentes
-          : gProximos;
+  var arr, col0, tit;
+  if (_alertaFiltro === 'vencidos') {
+    arr = gVencidos; col0 = 'var(--red)'; tit = 'Vencidos activos';
+  } else if (_alertaFiltro === 'vigentes') {
+    arr = gVigentes; col0 = 'var(--green)'; tit = 'Vigentes';
+  } else if (_alertaFiltro === 'renovando') {
+    arr = enRenovacion; col0 = 'var(--accent)'; tit = 'En renovaci\u00f3n';
+  } else {
+    arr = gProximos; col0 = 'var(--orange)'; tit = 'Por renovar \u2014 vencen en \u2264 60 d\u00edas';
+  }
 
   arr = arr.slice().sort(function(a,b){ return new Date(a.fv)-new Date(b.fv); });
 
   if (!arr.length) {
-    list.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted);font-size:13px">No hay contratos en esta categoría.</div>';
+    list.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted);font-size:13px">No hay contratos en esta categor\u00eda.</div>';
     return;
   }
-
-  var col0 = _alertaFiltro === 'vencidos' ? 'var(--red)' : _alertaFiltro === 'vigentes' ? 'var(--green)' : 'var(--orange)';
-  var tit  = _alertaFiltro === 'vencidos' ? 'Vencidos activos'
-           : _alertaFiltro === 'vigentes' ? 'Vigentes'
-           : 'Por renovar \u2014 vencen en \u2264 60 d\u00edas';
 
   var html = '<div style="font-size:11px;font-weight:700;color:'+col0+';text-transform:uppercase;letter-spacing:.5px;padding:12px 16px 6px;border-bottom:1px solid var(--border)">'+tit+' ('+arr.length+')</div>';
 
@@ -1514,11 +1530,25 @@ function renderAlertaLista(gVencidos, gProximos, gVigentes, hoy) {
     var r    = arr[i];
     var diff = Math.round((new Date(r.fv) - hoy) / 86400000);
     var col  = diff < 0 ? 'var(--red)' : diff <= 15 ? 'var(--red)' : diff <= 60 ? 'var(--orange)' : 'var(--green)';
-    var lbl  = diff < 0 ? 'Vencido hace '+Math.abs(diff)+' d\u00edas' : diff === 0 ? 'Vence hoy' : diff+' d\u00edas';
+    var lbl  = diff < 0 ? 'Vencido hace '+Math.abs(diff)+' d' : diff === 0 ? 'Vence hoy' : diff+' d\u00edas';
+
+    // Para los "en renovación" mostrar etapa actual
+    var etapaTag = '';
+    if (_alertaFiltro === 'renovando') {
+      var rv = (renovCache||[]).find(function(x){ return (x.arren||'').toUpperCase().trim() === (r.ar||'').toUpperCase().trim(); });
+      if (rv) {
+        var etObj = (typeof ETAPAS !== 'undefined') ? ETAPAS.find(function(e){ return e.id===rv.etapa; }) : null;
+        var etLabel = etObj ? etObj.label : rv.etapa;
+        etapaTag = ' <span style="background:var(--accent)22;color:var(--accent);border-radius:4px;padding:1px 6px;font-size:10px;font-weight:600">'+etLabel+'</span>';
+      }
+      col = 'var(--accent)';
+      lbl = diff < 0 ? 'Vencido' : diff+' d\u00edas';
+    }
+
     html += '<div class="alert-item" onclick="openModal('+r.ref+')">'
           + '<div class="alert-dot" style="background:'+col+'"></div>'
           + '<div class="alert-info">'
-          + '<div class="alert-main">'+(r.ar||'Sin arrendatario')+' \u00b7 '+r.e+'</div>'
+          + '<div class="alert-main">'+(r.ar||'Sin arrendatario')+' \u00b7 '+r.e+etapaTag+'</div>'
           + '<div class="alert-sub">Ref #'+r.ref+' \u00b7 '+r.tb+' \u00b7 '+fmtA(r.a)+' \u00b7 '+fmt(r.cm)+'/mes \u00b7 Vence: '+r.fv+'</div>'
           + '</div>'
           + '<div class="alert-days" style="color:'+col+';white-space:nowrap">'+lbl+'</div>'
@@ -2386,6 +2416,7 @@ function openContractDatesModal(id) {
     `<strong>${r.arren}</strong><br>${r.bien}`;
   document.getElementById('mfr-inicio').value = r.fecha_inicio_nuevo || '';
   document.getElementById('mfr-fin').value    = r.fecha_fin_nuevo    || '';
+  document.getElementById('mfr-nota').value   = r.nota_contrato      || '';
   document.getElementById('modal-fechas-renov').style.display = 'flex';
 }
 
@@ -2398,11 +2429,13 @@ async function saveContractDates() {
   if (!_contractDatesId) return;
   const inicio = document.getElementById('mfr-inicio').value;
   const fin    = document.getElementById('mfr-fin').value;
+  const nota   = document.getElementById('mfr-nota').value.trim();
   if (!inicio || !fin) { toast('Error', 'Completa ambas fechas.', 'error'); return; }
   try {
     await db.collection('renovaciones').doc(_contractDatesId).update({
       fecha_inicio_nuevo: inicio,
       fecha_fin_nuevo: fin,
+      nota_contrato: nota,
     });
     toast('Fechas guardadas', inicio + ' → ' + fin, 'success');
     closeContractDatesModal();
@@ -2491,9 +2524,12 @@ function renderRenovaciones() {
         <div style="font-size:12px;color:var(--muted);margin-bottom:8px">${r.bien}${r.vence?` · Vence: ${r.vence}`:''}</div>
         <div class="rn-prog">${dots}</div>
         ${r.nota?`<div style="font-size:11px;color:var(--muted);margin-top:6px;font-style:italic">${r.nota}</div>`:''}
-        ${(r.fecha_inicio_nuevo||r.fecha_fin_nuevo)?`<div style="display:flex;gap:12px;margin-top:8px;padding:6px 10px;background:var(--green)15;border:1px solid var(--green)40;border-radius:8px;flex-wrap:wrap">
-          ${r.fecha_inicio_nuevo?`<span style="font-size:11px;color:var(--green);font-weight:600">📅 Inicio: ${r.fecha_inicio_nuevo}</span>`:''}
-          ${r.fecha_fin_nuevo?`<span style="font-size:11px;color:var(--green);font-weight:600">📅 Fin: ${r.fecha_fin_nuevo}</span>`:''}
+        ${(r.fecha_inicio_nuevo||r.fecha_fin_nuevo)?`<div style="margin-top:8px;padding:6px 10px;background:var(--green)15;border:1px solid var(--green)40;border-radius:8px">
+          <div style="display:flex;gap:12px;flex-wrap:wrap">
+            ${r.fecha_inicio_nuevo?`<span style="font-size:11px;color:var(--green);font-weight:600">📅 Inicio: ${r.fecha_inicio_nuevo}</span>`:''}
+            ${r.fecha_fin_nuevo?`<span style="font-size:11px;color:var(--green);font-weight:600">📅 Fin: ${r.fecha_fin_nuevo}</span>`:''}
+          </div>
+          ${r.nota_contrato?`<div style="font-size:11px;color:#aaa;margin-top:5px;font-style:italic;border-top:1px solid var(--green)30;padding-top:5px">💬 ${r.nota_contrato}</div>`:''}
         </div>`:''}
         ${historial?`<div style="margin-top:6px">${historial}</div>`:''}
       </div>
@@ -2532,6 +2568,10 @@ function renderRenovaciones() {
     <div style="margin-bottom:24px">
       <label style="font-size:11px;color:#aaa;display:block;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">Fecha fin nuevo contrato</label>
       <input type="date" id="mfr-fin" style="width:100%;box-sizing:border-box;background:#0f0f18;border:1px solid #333;border-radius:8px;color:#fff;padding:9px 12px;font-size:13px;outline:none">
+    </div>
+    <div style="margin-bottom:24px">
+      <label style="font-size:11px;color:#aaa;display:block;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">Notas / Comentarios</label>
+      <textarea id="mfr-nota" rows="3" placeholder="Agrega un comentario o nota sobre este contrato..." style="width:100%;box-sizing:border-box;background:#0f0f18;border:1px solid #333;border-radius:8px;color:#fff;padding:9px 12px;font-size:13px;outline:none;resize:vertical;font-family:inherit"></textarea>
     </div>
     <div style="display:flex;gap:10px;justify-content:flex-end">
       <button onclick="closeContractDatesModal()" style="background:none;border:1px solid #444;color:#aaa;padding:8px 18px;border-radius:8px;font-size:13px;cursor:pointer">Cancelar</button>
