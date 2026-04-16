@@ -2249,6 +2249,11 @@ async function createUser() {
 }
 
 
+// ── Sanitizador XSS ───────────────────────────
+function esc(str) {
+  return String(str ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
 // ══════════════════════════════════════════════
 // RENOVACIONES
 // ══════════════════════════════════════════════
@@ -2378,7 +2383,10 @@ async function retrocederEtapa(id, currentEtapaId) {
   if (idx === 0) return;
   const prevEtapa = ETAPAS[idx-1];
   try {
-    await db.collection('renovaciones').doc(id).update({ etapa: prevEtapa.id });
+    const existing = renovCache.find(r=>r.id===id);
+    const historial = existing?.historial || [];
+    historial.push({ etapa: prevEtapa.id, fecha: new Date().toISOString().slice(0,10), user: currentUser.email, accion: 'retroceso' });
+    await db.collection('renovaciones').doc(id).update({ etapa: prevEtapa.id, historial });
     toast('Etapa retrocedida', prevEtapa.label, 'info');
   } catch(e) { toast('Error', e.message, 'error'); }
 }
@@ -2431,13 +2439,17 @@ async function saveContractDates() {
   const fin    = document.getElementById('mfr-fin').value;
   const nota   = document.getElementById('mfr-nota').value.trim();
   if (!inicio || !fin) { toast('Error', 'Completa ambas fechas.', 'error'); return; }
+  const hoy = new Date().toISOString().slice(0,10);
+  const autor = currentUser?.displayName || currentUser?.email || '';
   try {
     await db.collection('renovaciones').doc(_contractDatesId).update({
       fecha_inicio_nuevo: inicio,
       fecha_fin_nuevo: fin,
       nota_contrato: nota,
+      nota_contrato_por: nota ? autor : '',
+      nota_contrato_fecha: nota ? hoy : '',
     });
-    toast('Fechas guardadas', inicio + ' → ' + fin, 'success');
+    toast('Guardado', inicio + ' → ' + fin, 'success');
     closeContractDatesModal();
   } catch(e) { toast('Error', e.message, 'error'); }
 }
@@ -2445,7 +2457,7 @@ async function saveContractDates() {
 // ── Exportar renovaciones a CSV (abre en Excel) ─
 function exportRenovacionesCSV() {
   if (!renovCache.length) { toast('Sin datos', 'No hay renovaciones para exportar.', 'info'); return; }
-  const heads = ['Arrendatario','Bien / Estructura','Vencimiento original','Etapa','Responsable','Nota','Inicio nuevo contrato','Fin nuevo contrato'];
+  const heads = ['Arrendatario','Bien / Estructura','Vencimiento original','Etapa','Responsable','Nota','Inicio nuevo contrato','Fin nuevo contrato','Nota contrato','Nota por','Nota fecha'];
   const rows = renovCache.map(r => {
     const etapaLabel = ETAPAS.find(e => e.id === r.etapa)?.label || r.etapa;
     return [
@@ -2455,8 +2467,11 @@ function exportRenovacionesCSV() {
       etapaLabel,
       r.resp             || '',
       r.nota             || '',
-      r.fecha_inicio_nuevo || '',
-      r.fecha_fin_nuevo    || '',
+      r.fecha_inicio_nuevo  || '',
+      r.fecha_fin_nuevo     || '',
+      r.nota_contrato       || '',
+      r.nota_contrato_por   || '',
+      r.nota_contrato_fecha || '',
     ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(',');
   });
   const bom  = '\uFEFF';
@@ -2474,7 +2489,7 @@ function renderRenovaciones() {
   
   let filtered = renovCache.filter(r => {
     if (fe && r.etapa !== fe) return false;
-    if (s && !(r.arren||'').toLowerCase().includes(s) && !(r.bien||'').toLowerCase().includes(s)) return false;
+    if (s && !(r.arren||'').toLowerCase().includes(s) && !(r.bien||'').toLowerCase().includes(s) && !(r.resp||'').toLowerCase().includes(s) && !(r.nota||'').toLowerCase().includes(s) && !(r.nota_contrato||'').toLowerCase().includes(s)) return false;
     return true;
   });
 
@@ -2506,30 +2521,31 @@ function renderRenovaciones() {
       diasLabel = `<span style="font-size:11px;color:${color};font-weight:600">${dias < 0 ? 'Vencido' : dias+'d'}</span>`;
     }
 
-    // Historial tooltip
-    const historial = (r.historial||[]).slice(-3).map(h =>
-      `<div style="font-size:10px;color:var(--muted)">${h.fecha} · ${ETAPAS.find(e=>e.id===h.etapa)?.label||h.etapa}</div>`
+    // Historial
+    const histAll = r.historial || [];
+    const historial = histAll.map(h =>
+      `<div style="font-size:10px;color:var(--muted)">${esc(h.fecha)} · ${esc(ETAPAS.find(e=>e.id===h.etapa)?.label||h.etapa)}${h.accion==='retroceso'?' ↩':''}${h.user?` <span style="opacity:0.6">(${esc(h.user)})</span>`:''}</div>`
     ).join('');
 
     return `
     <div class="rn-card" onclick="openContractDatesModal('${r.id}')" style="cursor:pointer">
       <div style="flex:1;min-width:0">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap">
-          <div style="font-size:14px;font-weight:600">${r.arren}</div>
-          <span class="rn-etapa-pill" style="background:${etapa.color}22;color:${etapa.color}">${etapa.label}</span>
+          <div style="font-size:14px;font-weight:600">${esc(r.arren)}</div>
+          <span class="rn-etapa-pill" style="background:${etapa.color}22;color:${etapa.color}">${esc(etapa.label)}</span>
           ${diasLabel}
-          ${r.resp?`<span style="font-size:11px;color:var(--muted)">· ${r.resp}</span>`:''}
-          <span style="font-size:10px;color:var(--accent);opacity:0.7;margin-left:auto">📋 clic para editar fechas</span>
+          ${r.resp?`<span style="font-size:11px;color:var(--muted)">· ${esc(r.resp)}</span>`:''}
+          <span style="font-size:10px;color:var(--accent);opacity:0.7;margin-left:auto">📋 clic para editar fechas/notas</span>
         </div>
-        <div style="font-size:12px;color:var(--muted);margin-bottom:8px">${r.bien}${r.vence?` · Vence: ${r.vence}`:''}</div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:8px">${esc(r.bien)}${r.vence?` · Vence: ${esc(r.vence)}`:''}</div>
         <div class="rn-prog">${dots}</div>
-        ${r.nota?`<div style="font-size:11px;color:var(--muted);margin-top:6px;font-style:italic">${r.nota}</div>`:''}
-        ${(r.fecha_inicio_nuevo||r.fecha_fin_nuevo)?`<div style="margin-top:8px;padding:6px 10px;background:var(--green)15;border:1px solid var(--green)40;border-radius:8px">
+        ${r.nota?`<div style="font-size:11px;color:var(--muted);margin-top:6px;font-style:italic">${esc(r.nota)}</div>`:''}
+        ${(r.fecha_inicio_nuevo||r.fecha_fin_nuevo||r.nota_contrato)?`<div style="margin-top:8px;padding:6px 10px;background:var(--green)15;border:1px solid var(--green)40;border-radius:8px">
           <div style="display:flex;gap:12px;flex-wrap:wrap">
-            ${r.fecha_inicio_nuevo?`<span style="font-size:11px;color:var(--green);font-weight:600">📅 Inicio: ${r.fecha_inicio_nuevo}</span>`:''}
-            ${r.fecha_fin_nuevo?`<span style="font-size:11px;color:var(--green);font-weight:600">📅 Fin: ${r.fecha_fin_nuevo}</span>`:''}
+            ${r.fecha_inicio_nuevo?`<span style="font-size:11px;color:var(--green);font-weight:600">📅 Inicio: ${esc(r.fecha_inicio_nuevo)}</span>`:''}
+            ${r.fecha_fin_nuevo?`<span style="font-size:11px;color:var(--green);font-weight:600">📅 Fin: ${esc(r.fecha_fin_nuevo)}</span>`:''}
           </div>
-          ${r.nota_contrato?`<div style="font-size:11px;color:#aaa;margin-top:5px;font-style:italic;border-top:1px solid var(--green)30;padding-top:5px">💬 ${r.nota_contrato}</div>`:''}
+          ${r.nota_contrato?`<div style="font-size:11px;color:#aaa;margin-top:5px;font-style:italic;border-top:1px solid var(--green)30;padding-top:5px">💬 ${esc(r.nota_contrato)}${r.nota_contrato_por?`<span style="font-size:10px;color:var(--muted);margin-left:8px">— ${esc(r.nota_contrato_por)}${r.nota_contrato_fecha?' · '+esc(r.nota_contrato_fecha):''}</span>`:''}</div>`:''}
         </div>`:''}
         ${historial?`<div style="margin-top:6px">${historial}</div>`:''}
       </div>
@@ -2559,7 +2575,7 @@ function renderRenovaciones() {
 <!-- Modal fechas contrato renovado — fuera de cualquier page para que position:fixed funcione -->
 <div id="modal-fechas-renov" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.78);z-index:9999;align-items:center;justify-content:center" onclick="if(event.target===this)closeContractDatesModal()">
   <div style="background:#1a1a24;border:1px solid var(--accent);border-radius:16px;padding:28px;width:420px;max-width:92vw;box-shadow:0 8px 40px #000c">
-    <div style="font-size:15px;font-weight:700;color:var(--accent);margin-bottom:6px">📋 Fechas del nuevo contrato</div>
+    <div style="font-size:15px;font-weight:700;color:var(--accent);margin-bottom:6px">📋 Fechas y notas del nuevo contrato</div>
     <div id="modal-fechas-arren" style="font-size:12px;color:#aaa;margin-bottom:22px;line-height:1.6"></div>
     <div style="margin-bottom:16px">
       <label style="font-size:11px;color:#aaa;display:block;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">Fecha inicio nuevo contrato</label>
