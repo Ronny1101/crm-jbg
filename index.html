@@ -332,7 +332,7 @@ document.addEventListener('DOMContentLoaded', function() {
   <div id="sidebar">
     <div class="logo">
       <div class="logo-title">Portafolio<br>Renting</div>
-      <div class="logo-sub">CRM · Dic 2025</div>
+      <div class="logo-sub" id="sidebar-fecha">CRM</div>
     </div>
     <div class="user-bar">
       <div class="user-avatar" id="sb-avatar">?</div>
@@ -346,44 +346,44 @@ document.addEventListener('DOMContentLoaded', function() {
     </div>
     <nav>
       <div class="nav-section">Principal</div>
-      <div class="nav-item active" id="n-dashboard" onclick="showPage('dashboard')">
+      <div class="nav-item active" id="n-dashboard" onclick="showPage('dashboard')" title="Dashboard">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
         <span>Dashboard</span>
       </div>
-      <div class="nav-item" id="n-inventario" onclick="showPage('inventario')">
+      <div class="nav-item" id="n-inventario" onclick="showPage('inventario')" title="Inventario">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="16" y1="13" x2="8" y2="13"/></svg>
         <span>Inventario</span>
       </div>
       <div class="nav-section">Análisis</div>
-      <div class="nav-item" id="n-alertas" onclick="showPage('alertas')">
+      <div class="nav-item" id="n-alertas" onclick="showPage('alertas')" title="Alertas de vencimiento">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
         <span>Alertas</span>
         <span class="nav-badge" id="alert-badge" style="display:none">0</span>
       </div>
-      <div class="nav-item" id="n-contratos" onclick="showPage('contratos')">
+      <div class="nav-item" id="n-contratos" onclick="showPage('contratos')" title="Contratos activos">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
         <span>Contratos</span>
       </div>
       <div class="nav-section">Equipo</div>
-      <div class="nav-item" id="n-actividad" onclick="showPage('actividad')">
+      <div class="nav-item" id="n-actividad" onclick="showPage('actividad')" title="Actividad del equipo">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
         <span>Actividad</span>
         <span class="nav-pulse" id="live-dot"></span>
       </div>
-      <div class="nav-item" id="n-usuarios" onclick="showPage('usuarios')" style="display:none">
+      <div class="nav-item" id="n-usuarios" onclick="showPage('usuarios')" title="Gestión de usuarios" style="display:none">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
         <span>Usuarios</span>
       </div>
-      <div class="nav-item" id="n-renovaciones" onclick="showPage('renovaciones')" style="display:none">
+      <div class="nav-item" id="n-renovaciones" onclick="showPage('renovaciones')" title="Renovaciones de contratos" style="display:none">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
         <span>Renovaciones</span>
       </div>
       <div class="nav-section">Financiero</div>
-      <div class="nav-item" id="n-garantias" onclick="showPage('garantias')">
+      <div class="nav-item" id="n-garantias" onclick="showPage('garantias')" title="Garantías de arrendatarios">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
         <span>Garantías</span>
       </div>
-      <div class="nav-item" id="n-polizas" onclick="showPage('polizas')">
+      <div class="nav-item" id="n-polizas" onclick="showPage('polizas')" title="Pólizas y garantías bancarias">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10,9 9,9 8,9"/></svg>
         <span>Pólizas</span>
       </div>
@@ -398,7 +398,7 @@ document.addEventListener('DOMContentLoaded', function() {
     <div class="page active" id="page-dashboard">
       <div class="page-header">
         <div class="page-title">Dashboard</div>
-        <div class="page-sub">Portafolio actualizado · Marzo 2026</div>
+        <div class="page-sub" id="dash-fecha">Portafolio actualizado</div>
       </div>
       <div class="kpi-grid" id="kpi-grid"></div>
       <div class="charts-grid">
@@ -490,6 +490,7 @@ document.addEventListener('DOMContentLoaded', function() {
             <option value="">Estado</option><option>Vigente</option><option>Por Renovar</option><option>Vencido</option>
           </select>
           <span class="tcount" id="ct-count">–</span>
+          <button class="btn-export" onclick="exportContratosCSV()">↓ CSV</button>
         </div>
         <div class="table-wrap">
           <table>
@@ -991,6 +992,14 @@ async function doLogout() {
 async function startApp() {
   hide('login-screen'); hide('setup-screen'); hide('loading-overlay');
   show('app');
+  // Fechas dinámicas
+  const ahora = new Date();
+  const mes = ahora.toLocaleDateString('es-EC', { month: 'long', year: 'numeric' });
+  const mesCap = mes.charAt(0).toUpperCase() + mes.slice(1);
+  const sidebarFecha = document.getElementById('sidebar-fecha');
+  const dashFecha = document.getElementById('dash-fecha');
+  if (sidebarFecha) sidebarFecha.textContent = 'CRM · ' + mesCap;
+  if (dashFecha) dashFecha.textContent = 'Portafolio actualizado · ' + mesCap;
   // Load roles first
   await loadUserRoles();
   await registerUserAccess();
@@ -1291,8 +1300,10 @@ function sortInv(k) {
 function renderInv() {
   const PS=30, start=(invPage-1)*PS, page=invFiltered.slice(start,start+PS);
   document.getElementById('inv-count').textContent=invFiltered.length+' registros';
-  document.getElementById('inv-body').innerHTML=page.map(r=>`
-    <tr onclick="openModal(${r.ref})">
+  document.getElementById('inv-body').innerHTML=page.map(r=>{
+    const rowColor = r.es==='Vencido' ? 'var(--red)' : r.es==='Por Renovar' ? 'var(--orange)' : r.d==='LIBRE'||r.d==='LIBRE NO LISTO' ? 'var(--accent2)' : 'transparent';
+    return `
+    <tr onclick="openModal(${r.ref})" style="border-left:3px solid ${rowColor}">
       <td style="color:var(--muted);font-size:12px">#${r.ref}</td>
       <td style="font-weight:500;max-width:140px;overflow:hidden;text-overflow:ellipsis">${r.e}</td>
       <td style="color:var(--muted);font-size:12px;max-width:100px;overflow:hidden;text-overflow:ellipsis">${r.ag||'–'}</td>
@@ -1304,7 +1315,8 @@ function renderInv() {
       <td style="max-width:130px;overflow:hidden;text-overflow:ellipsis">${r.ar||'–'}</td>
       <td>${r.fv||'–'}</td>
       <td>${ebdg(r.es)}</td>
-    </tr>`).join('');
+    </tr>`;
+  }).join('');
   const total=Math.ceil(invFiltered.length/PS)||1;
   document.getElementById('pag-info').textContent=`Pág. ${invPage} / ${total}`;
   document.getElementById('pag-prev').disabled=invPage<=1;
@@ -1330,20 +1342,38 @@ function filterCt() {
 }
 function renderCt() {
   const PS=30, start=(ctPage-1)*PS, page=ctFiltered.slice(start,start+PS);
-  document.getElementById('ct-body').innerHTML=page.map(r=>`
-    <tr onclick="openModal(${r.ref})">
+  document.getElementById('ct-body').innerHTML=page.map(r=>{
+    const rowColor = r.es==='Vencido' ? 'var(--red)' : r.es==='Por Renovar' ? 'var(--orange)' : 'var(--green)';
+    return `
+    <tr onclick="openModal(${r.ref})" style="border-left:3px solid ${rowColor}">
       <td style="color:var(--muted);font-size:12px">#${r.ref}</td>
       <td style="font-weight:500;max-width:150px;overflow:hidden;text-overflow:ellipsis">${r.ar}</td>
       <td>${r.e}</td><td>${r.tb||'–'}</td>
       <td>${fmtA(r.a)}</td><td>${fmt(r.cm)}</td><td>${fmt(r.ca)}</td>
       <td>${r.fi||'–'}</td><td>${r.fv||'–'}</td><td>${ebdg(r.es)}</td>
-    </tr>`).join('');
+    </tr>`;
+  }).join('');
   const total=Math.ceil(ctFiltered.length/30)||1;
   document.getElementById('ct-info').textContent=`Pág. ${ctPage} / ${total}`;
   document.getElementById('ct-prev').disabled=ctPage<=1;
   document.getElementById('ct-next').disabled=ctPage>=total;
 }
 function changePagCt(d) { ctPage+=d; renderCt(); }
+
+function exportContratosCSV() {
+  if (!ctFiltered.length) { toast('Sin datos', 'No hay contratos para exportar.', 'info'); return; }
+  const heads = ['Ref','Arrendatario','Estructura','Tipo','Área m²','Canon/mes','Canon anual','Inicio','Vencimiento','Estado'];
+  const rows = ctFiltered.map(r => [
+    r.ref, r.ar||'', r.e||'', r.tb||'', r.a||'',
+    r.cm||'', r.ca||'', r.fi||'', r.fv||'', r.es||''
+  ].map(v => `"${String(v).replace(/"/g,'""')}"`).join(','));
+  const blob = new Blob(['\uFEFF' + [heads.join(','), ...rows].join('\r\n')], { type:'text/csv;charset=utf-8;' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'contratos_activos.csv';
+  a.click();
+  toast('Exportado', ctFiltered.length + ' contratos descargados', 'success');
+}
 
 // ══════════════════════════════════════════════
 // ALERTAS
@@ -2586,7 +2616,10 @@ function renderRenovaciones() {
           <span style="font-size:10px;color:var(--accent);opacity:0.7;margin-left:auto">📋 clic para editar fechas/notas</span>
         </div>
         <div style="font-size:12px;color:var(--muted);margin-bottom:8px">${esc(r.bien)}${r.vence?` · Vence: ${esc(r.vence)}`:''}</div>
-        <div class="rn-prog">${dots}</div>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
+          <div class="rn-prog" style="margin-top:0;flex:1">${dots}</div>
+          <span style="font-size:10px;color:var(--muted);white-space:nowrap;flex-shrink:0">${isLast ? '✓ Completado' : `Etapa ${etapaIdx+1} de ${ETAPAS.length}`}</span>
+        </div>
         ${r.nota?`<div style="font-size:11px;color:var(--muted);margin-top:6px;font-style:italic">${esc(r.nota)}</div>`:''}
         ${(r.fecha_inicio_nuevo||r.fecha_fin_nuevo||r.nota_contrato)?`<div style="margin-top:8px;padding:6px 10px;background:var(--green)15;border:1px solid var(--green)40;border-radius:8px">
           <div style="display:flex;gap:12px;flex-wrap:wrap">
@@ -2595,7 +2628,7 @@ function renderRenovaciones() {
           </div>
           ${r.nota_contrato?`<div style="font-size:11px;color:#aaa;margin-top:5px;font-style:italic;border-top:1px solid var(--green)30;padding-top:5px">💬 ${esc(r.nota_contrato)}${r.nota_contrato_por?`<span style="font-size:10px;color:var(--muted);margin-left:8px">— ${esc(r.nota_contrato_por)}${r.nota_contrato_fecha?' · '+esc(r.nota_contrato_fecha):''}</span>`:''}</div>`:''}
         </div>`:''}
-        ${historial?`<div style="margin-top:6px">${historial}</div>`:''}
+        ${historial?`<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border)"><div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;font-weight:600;margin-bottom:4px">Historial de movimientos</div>${historial}</div>`:''}
       </div>
       <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0;align-items:flex-end" onclick="event.stopPropagation()">
         ${!isLast?`<button onclick="avanzarEtapa('${r.id}','${r.etapa}')" style="background:var(--accent);color:#0f0f13;border:none;padding:5px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap">→ Avanzar</button>`:'<span style="font-size:11px;color:var(--green);font-weight:600">✓ Completado</span>'}
