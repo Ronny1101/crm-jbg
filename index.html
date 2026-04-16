@@ -695,6 +695,7 @@ document.addEventListener('DOMContentLoaded', function() {
             <option value="docusign">DocuSign enviado</option><option value="cumplimiento">Pendiente firmas cumplimiento</option><option value="documentacion">Pendiente documentación</option><option value="gerencia">Pendiente revisión gerencia/auditoría</option><option value="condiciones">Pendiente aprobación condiciones</option><option value="elaboracion">En elaboración de contrato</option><option value="firma_ds">Pendiente firmas DocuSign</option><option value="firma_arren">Pendiente firma arrendatario</option><option value="firma_jbg">Pendiente firma JBG</option><option value="pend_notarizar">Pendiente notarización</option><option value="notariado">Notarizado ✓</option>
           </select>
           <span class="tcount" id="rn-count">–</span>
+          <button id="rn-toggle-norenueva" onclick="toggleNoRenueva()" style="background:none;border:1px solid var(--border);color:var(--muted);padding:5px 12px;border-radius:6px;font-size:12px;cursor:pointer">👁 Ver no renuevan</button>
           <button class="btn-export" onclick="exportRenovacionesCSV()">↓ Excel/CSV</button>
         </div>
 
@@ -2457,7 +2458,7 @@ async function saveContractDates() {
 // ── Exportar renovaciones a CSV (abre en Excel) ─
 function exportRenovacionesCSV() {
   if (!renovCache.length) { toast('Sin datos', 'No hay renovaciones para exportar.', 'info'); return; }
-  const heads = ['Arrendatario','Bien / Estructura','Vencimiento original','Etapa','Responsable','Nota','Inicio nuevo contrato','Fin nuevo contrato','Nota contrato','Nota por','Nota fecha'];
+  const heads = ['Arrendatario','Bien / Estructura','Vencimiento original','Etapa','Responsable','Nota','Inicio nuevo contrato','Fin nuevo contrato','Nota contrato','Nota por','Nota fecha','Estado'];
   const rows = renovCache.map(r => {
     const etapaLabel = ETAPAS.find(e => e.id === r.etapa)?.label || r.etapa;
     return [
@@ -2472,6 +2473,7 @@ function exportRenovacionesCSV() {
       r.nota_contrato       || '',
       r.nota_contrato_por   || '',
       r.nota_contrato_fecha || '',
+      r.estado === 'no_renueva' ? 'No renueva' : 'Activa',
     ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(',');
   });
   const bom  = '\uFEFF';
@@ -2483,17 +2485,61 @@ function exportRenovacionesCSV() {
   toast('Exportado', renovCache.length + ' registros descargados', 'success');
 }
 
+var _mostrarNoRenueva = false;
+
+function toggleNoRenueva() {
+  _mostrarNoRenueva = !_mostrarNoRenueva;
+  const btn = document.getElementById('rn-toggle-norenueva');
+  if (btn) {
+    btn.textContent = _mostrarNoRenueva ? '👁 Ocultar no renuevan' : '👁 Ver no renuevan';
+    btn.style.borderColor = _mostrarNoRenueva ? 'var(--orange)' : 'var(--border)';
+    btn.style.color = _mostrarNoRenueva ? 'var(--orange)' : 'var(--muted)';
+  }
+  renderRenovaciones();
+}
+
+async function marcarNoRenueva(id, marcar) {
+  if (!isAdmin()) return;
+  const r = renovCache.find(x => x.id === id);
+  if (!r) return;
+  const msg = marcar
+    ? `¿Marcar a "${r.arren}" como NO renueva? Se ocultará del flujo activo.`
+    : `¿Reactivar la renovación de "${r.arren}"?`;
+  if (!confirm(msg)) return;
+  try {
+    const historial = r.historial || [];
+    historial.push({
+      etapa: r.etapa,
+      fecha: new Date().toISOString().slice(0,10),
+      user: currentUser.email,
+      accion: marcar ? 'no_renueva' : 'reactivado',
+    });
+    await db.collection('renovaciones').doc(id).update({
+      estado: marcar ? 'no_renueva' : 'activo',
+      historial,
+    });
+    toast(marcar ? 'Marcado como no renueva' : 'Renovación reactivada', r.arren, marcar ? 'info' : 'success');
+  } catch(e) { toast('Error', e.message, 'error'); }
+}
+
 function renderRenovaciones() {
   const s = (document.getElementById('rn-search')?.value||'').toLowerCase();
   const fe = document.getElementById('rn-filter-etapa')?.value||'';
-  
+
   let filtered = renovCache.filter(r => {
+    const esNoRenueva = r.estado === 'no_renueva';
+    if (!_mostrarNoRenueva && esNoRenueva) return false;
+    if (_mostrarNoRenueva && !esNoRenueva) return false;
     if (fe && r.etapa !== fe) return false;
     if (s && !(r.arren||'').toLowerCase().includes(s) && !(r.bien||'').toLowerCase().includes(s) && !(r.resp||'').toLowerCase().includes(s) && !(r.nota||'').toLowerCase().includes(s) && !(r.nota_contrato||'').toLowerCase().includes(s)) return false;
     return true;
   });
 
-  document.getElementById('rn-count').textContent = filtered.length + ' renovaciones';
+  const noRenuevanCount = renovCache.filter(r => r.estado === 'no_renueva').length;
+  const label = _mostrarNoRenueva
+    ? `${filtered.length} no renuevan`
+    : `${filtered.length} activas${noRenuevanCount > 0 ? ` · ${noRenuevanCount} no renuevan` : ''}`;
+  document.getElementById('rn-count').textContent = label;
 
   const container = document.getElementById('rn-list');
   if (!container) return;
@@ -2504,6 +2550,7 @@ function renderRenovaciones() {
   }
 
   container.innerHTML = filtered.map(r => {
+    const esNoRenueva = r.estado === 'no_renueva';
     const etapa = ETAPAS.find(e=>e.id===r.etapa) || ETAPAS[0];
     const etapaIdx = ETAPAS.findIndex(e=>e.id===r.etapa);
     const isLast = etapaIdx === ETAPAS.length-1;
@@ -2528,7 +2575,8 @@ function renderRenovaciones() {
     ).join('');
 
     return `
-    <div class="rn-card" onclick="openContractDatesModal('${r.id}')" style="cursor:pointer">
+    <div class="rn-card" onclick="openContractDatesModal('${r.id}')" style="cursor:pointer;${esNoRenueva?'opacity:0.55;border-color:var(--orange)40;':''}">
+      ${esNoRenueva?`<div style="background:var(--orange)15;border-bottom:1px solid var(--orange)30;padding:4px 12px;font-size:11px;color:var(--orange);font-weight:600;border-radius:10px 10px 0 0;margin:-12px -12px 10px -12px">🚫 No se renovará</div>`:''}
       <div style="flex:1;min-width:0">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap">
           <div style="font-size:14px;font-weight:600">${esc(r.arren)}</div>
@@ -2554,6 +2602,10 @@ function renderRenovaciones() {
         ${etapaIdx>0?`<button onclick="retrocederEtapa('${r.id}','${r.etapa}')" style="background:none;border:1px solid var(--border);color:var(--muted);padding:4px 10px;border-radius:6px;font-size:11px;cursor:pointer">← Retroceder</button>`:''}
         <div style="display:flex;gap:4px">
           <button onclick="openEditRenov(${JSON.stringify(r).replace(/"/g,'&quot;')})" style="background:none;border:1px solid var(--border);color:var(--muted);padding:4px 8px;border-radius:6px;font-size:11px;cursor:pointer">✏</button>
+          ${r.estado==='no_renueva'
+            ? `<button onclick="marcarNoRenueva('${r.id}', false)" style="background:var(--orange)20;border:1px solid var(--orange);color:var(--orange);padding:4px 8px;border-radius:6px;font-size:11px;cursor:pointer" title="Reactivar renovación">↺ Reactivar</button>`
+            : `<button onclick="marcarNoRenueva('${r.id}', true)" style="background:none;border:1px solid var(--orange);color:var(--orange);padding:4px 8px;border-radius:6px;font-size:11px;cursor:pointer" title="Marcar como no renueva">🚫 No renueva</button>`
+          }
           <button onclick="deleteRenovacion('${r.id}')" style="background:none;border:1px solid var(--red);color:var(--red);padding:4px 8px;border-radius:6px;font-size:11px;cursor:pointer">✕</button>
         </div>
       </div>
