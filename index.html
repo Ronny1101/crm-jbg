@@ -2620,13 +2620,17 @@ function renderRenovaciones() {
           <div class="rn-prog" style="margin-top:0;flex:1">${dots}</div>
           <span style="font-size:10px;color:var(--muted);white-space:nowrap;flex-shrink:0">${isLast ? '✓ Completado' : `Etapa ${etapaIdx+1} de ${ETAPAS.length}`}</span>
         </div>
-        ${r.nota?`<div style="font-size:11px;color:var(--muted);margin-top:6px;font-style:italic">${esc(r.nota)}</div>`:''}
-        ${(r.fecha_inicio_nuevo||r.fecha_fin_nuevo||r.nota_contrato)?`<div style="margin-top:8px;padding:6px 10px;background:var(--green)15;border:1px solid var(--green)40;border-radius:8px">
-          <div style="display:flex;gap:12px;flex-wrap:wrap">
+        ${r.nota?`<div style="margin-top:8px;padding:8px 12px;background:var(--accent)12;border-left:3px solid var(--accent);border-radius:0 6px 6px 0;display:flex;align-items:flex-start;gap:7px">
+          <span style="font-size:14px;flex-shrink:0;margin-top:1px">📌</span>
+          <div><div style="font-size:10px;color:var(--accent);font-weight:700;text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px">Nota</div><div style="font-size:12px;color:var(--text);line-height:1.5">${esc(r.nota)}</div></div>
+        </div>`:''}
+        ${(r.fecha_inicio_nuevo||r.fecha_fin_nuevo)?`<div style="margin-top:8px;padding:6px 10px;background:var(--green)12;border:1px solid var(--green)35;border-radius:8px;display:flex;gap:12px;flex-wrap:wrap">
             ${r.fecha_inicio_nuevo?`<span style="font-size:11px;color:var(--green);font-weight:600">📅 Inicio: ${esc(r.fecha_inicio_nuevo)}</span>`:''}
             ${r.fecha_fin_nuevo?`<span style="font-size:11px;color:var(--green);font-weight:600">📅 Fin: ${esc(r.fecha_fin_nuevo)}</span>`:''}
-          </div>
-          ${r.nota_contrato?`<div style="font-size:11px;color:#aaa;margin-top:5px;font-style:italic;border-top:1px solid var(--green)30;padding-top:5px">💬 ${esc(r.nota_contrato)}${r.nota_contrato_por?`<span style="font-size:10px;color:var(--muted);margin-left:8px">— ${esc(r.nota_contrato_por)}${r.nota_contrato_fecha?' · '+esc(r.nota_contrato_fecha):''}</span>`:''}</div>`:''}
+        </div>`:''}
+        ${r.nota_contrato?`<div style="margin-top:8px;padding:8px 12px;background:#5e8fd418;border-left:3px solid var(--accent2);border-radius:0 6px 6px 0;display:flex;align-items:flex-start;gap:7px">
+          <span style="font-size:14px;flex-shrink:0;margin-top:1px">💬</span>
+          <div style="flex:1;min-width:0"><div style="font-size:10px;color:var(--accent2);font-weight:700;text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px">Comentario contrato</div><div style="font-size:12px;color:var(--text);line-height:1.5">${esc(r.nota_contrato)}</div>${r.nota_contrato_por?`<div style="font-size:10px;color:var(--muted);margin-top:3px">— ${esc(r.nota_contrato_por)}${r.nota_contrato_fecha?' · '+esc(r.nota_contrato_fecha):''}</div>`:''}</div>
         </div>`:''}
         ${historial?`<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border)"><div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;font-weight:600;margin-bottom:4px">Historial de movimientos</div>${historial}</div>`:''}
       </div>
