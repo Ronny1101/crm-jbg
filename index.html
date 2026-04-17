@@ -105,7 +105,7 @@ nav{padding:8px 0;flex:1;overflow-y:auto;}
 .page-sub{font-size:12px;color:var(--muted);margin-top:3px;}
 
 /* ── KPI ── */
-.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:22px;}
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:22px;}
 .kpi-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px;border-top:2px solid var(--card-color,var(--accent));}
 .kpi-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;}
 .kpi-val{font-family:'DM Serif Display',serif;font-size:24px;}
@@ -1230,11 +1230,15 @@ function renderDashboard() {
   }).length;
   document.getElementById('alert-badge').textContent = alertCnt;
   document.getElementById('alert-badge').style.display = alertCnt > 0 ? '' : 'none';
+  const estructuras = [...new Set(data.map(r=>r.e))].length;
+  const renovActivas = (renovCache||[]).filter(rv => rv.estado !== 'no_renueva').length;
+  const renovColor = renovActivas > 0 ? 'var(--accent)' : 'var(--muted)';
   document.getElementById('kpi-grid').innerHTML = `
-    <div class="kpi-card" style="--card-color:var(--accent)"><div class="kpi-label">Total unidades</div><div class="kpi-val">${data.length}</div><div class="kpi-sub">18 estructuras</div></div>
+    <div class="kpi-card" style="--card-color:var(--accent)"><div class="kpi-label">Total unidades</div><div class="kpi-val">${data.length}</div><div class="kpi-sub">${estructuras} estructuras</div></div>
     <div class="kpi-card" style="--card-color:var(--accent2)"><div class="kpi-label">Alquiladas</div><div class="kpi-val">${alq.length}</div><div class="kpi-sub">${((alq.length/data.length)*100).toFixed(1)}% ocupación</div></div>
     <div class="kpi-card" style="--card-color:var(--green)"><div class="kpi-label">Canon mensual</div><div class="kpi-val">${fmt(canon)}</div><div class="kpi-sub">${fmt(canon*12)} / año</div></div>
     <div class="kpi-card" style="--card-color:var(--red)"><div class="kpi-label">Alertas vencimiento</div><div class="kpi-val">${alertCnt}</div><div class="kpi-sub">próximos 60 días</div></div>
+    <div class="kpi-card" onclick="showPage('renovaciones')" style="--card-color:${renovColor};cursor:pointer" title="Ver renovaciones"><div class="kpi-label">En renovación</div><div class="kpi-val" style="color:${renovColor}">${renovActivas}</div><div class="kpi-sub">${renovActivas > 0 ? 'contratos en proceso' : 'sin renovaciones activas'}</div></div>
   `;
   // Disponibilidad chart
   const dc = {};
@@ -1496,12 +1500,15 @@ function renderAlertas() {
 
   var conFecha  = data.filter(function(r){ return r.fv; });
 
-  // Separar en renovando vs no-renovando
+  // Solo los que tienen renovación activa (excluir no_renueva)
+  var renovActivos = (renovCache||[]).filter(function(rv){ return rv.estado !== 'no_renueva'; });
+  var enRenovSetActivo = new Set(renovActivos.map(function(rv){ return (rv.arren||'').toUpperCase().trim(); }));
+
   var enRenovacion = conFecha.filter(function(r){
-    return r.ar && enRenovSet.has(r.ar.toUpperCase().trim());
+    return r.ar && enRenovSetActivo.has(r.ar.toUpperCase().trim());
   });
   var sinRenov = conFecha.filter(function(r){
-    return !r.ar || !enRenovSet.has(r.ar.toUpperCase().trim());
+    return !r.ar || !enRenovSetActivo.has(r.ar.toUpperCase().trim());
   });
 
   var gVencidos = sinRenov.filter(function(r){ return (new Date(r.fv)-hoy)/86400000 < 0; });
@@ -1532,6 +1539,27 @@ function renderAlertas() {
 function setAlertaFiltro(f) {
   _alertaFiltro = f;
   renderAlertas();
+}
+
+function irARenovacion(renovId) {
+  showPage('renovaciones');
+  // Esperar a que renderice y luego resaltar la tarjeta
+  setTimeout(function() {
+    var cards = document.querySelectorAll('#rn-list .rn-card');
+    cards.forEach(function(card) {
+      var btn = card.querySelector('button[onclick*="' + renovId + '"]');
+      if (btn || card.getAttribute('onclick') && card.getAttribute('onclick').includes(renovId)) {
+        card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        card.style.transition = 'box-shadow .3s, border-color .3s';
+        card.style.boxShadow = '0 0 0 3px var(--accent2)';
+        card.style.borderColor = 'var(--accent2)';
+        setTimeout(function() {
+          card.style.boxShadow = '';
+          card.style.borderColor = '';
+        }, 2500);
+      }
+    });
+  }, 300);
 }
 
 function renderAlertaLista(gVencidos, gProximos, gVigentes, enRenovacion, hoy) {
@@ -1576,10 +1604,16 @@ function renderAlertaLista(gVencidos, gProximos, gVigentes, enRenovacion, hoy) {
       lbl = diff < 0 ? 'Vencido' : diff+' d\u00edas';
     }
 
-    html += '<div class="alert-item" onclick="openModal('+r.ref+')">'
+    var clickFn = (_alertaFiltro === 'renovando' && rv)
+      ? 'irARenovacion(\'' + rv.id + '\')'
+      : 'openModal(' + r.ref + ')';
+    var accionTag = (_alertaFiltro === 'renovando' && rv)
+      ? '<span style="font-size:10px;color:var(--accent2);margin-left:auto;white-space:nowrap">Ver en Renovaciones →</span>'
+      : '';
+    html += '<div class="alert-item" onclick="'+clickFn+'">'
           + '<div class="alert-dot" style="background:'+col+'"></div>'
-          + '<div class="alert-info">'
-          + '<div class="alert-main">'+(r.ar||'Sin arrendatario')+' \u00b7 '+r.e+etapaTag+'</div>'
+          + '<div class="alert-info" style="min-width:0">'
+          + '<div class="alert-main" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">'+(r.ar||'Sin arrendatario')+' \u00b7 '+r.e+etapaTag+accionTag+'</div>'
           + '<div class="alert-sub">Ref #'+r.ref+' \u00b7 '+r.tb+' \u00b7 '+fmtA(r.a)+' \u00b7 '+fmt(r.cm)+'/mes \u00b7 Vence: '+r.fv+'</div>'
           + '</div>'
           + '<div class="alert-days" style="color:'+col+';white-space:nowrap">'+lbl+'</div>'
@@ -1655,7 +1689,12 @@ function openModal(ref) {
       <div class="m-field"><label>Canon mensual</label><div class="mval" style="font-size:16px;color:var(--accent)">${r.cm>0?fmt(r.cm):'–'}</div></div>
       <div class="m-field"><label>Canon anual</label><div class="mval">${fmt(r.ca)}</div></div>
       <div class="m-field"><label>Inicio contrato</label><div class="mval">${r.fi||'–'}</div></div>
-      <div class="m-field"><label>Vencimiento</label><div class="mval">${r.fv||'–'}</div></div>
+      <div class="m-field"><label>Vencimiento</label><div class="mval">${r.fv ? (() => {
+        const dias = Math.round((new Date(r.fv) - new Date()) / 86400000);
+        const col  = dias < 0 ? 'var(--red)' : dias <= 30 ? 'var(--red)' : dias <= 60 ? 'var(--orange)' : 'var(--green)';
+        const lbl  = dias < 0 ? `Vencido hace ${Math.abs(dias)}d` : dias === 0 ? 'Vence hoy' : `${dias}d restantes`;
+        return `${r.fv} <span style="font-size:11px;font-weight:700;color:${col};margin-left:6px">(${lbl})</span>`;
+      })() : '–'}</div></div>
       <div class="m-field"><label>Avalúo</label><div class="mval">${fmt(r.av)}</div></div>
       <div class="m-field"><label>Rentabilidad</label><div class="mval" style="color:var(--green)">${fmtPct(r.rt)}</div></div>
     </div>
@@ -1789,9 +1828,27 @@ function openModal(ref) {
     </div>
   ` : '<div class="no-data">No se encontraron pólizas para este arrendatario.</div>';
 
+  // ── Detectar si hay renovación activa para este arrendatario ──
+  const renovActiva = arName ? (renovCache||[]).find(rv =>
+    (rv.arren||'').toUpperCase().trim() === arName && rv.estado !== 'no_renueva'
+  ) : null;
+  const renovBanner = renovActiva ? (() => {
+    const etObj = ETAPAS.find(e => e.id === renovActiva.etapa);
+    const etIdx  = ETAPAS.findIndex(e => e.id === renovActiva.etapa);
+    return `<div style="background:var(--accent2)18;border:1px solid var(--accent2)50;border-radius:10px;padding:10px 14px;margin-bottom:4px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <span style="font-size:18px">🔄</span>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:12px;font-weight:700;color:var(--accent2)">CONTRATO EN PROCESO DE RENOVACIÓN</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:2px">Etapa ${etIdx+1} de ${ETAPAS.length} · <span style="color:var(--accent2)">${etObj?etObj.label:renovActiva.etapa}</span>${renovActiva.resp?' · Resp: '+esc(renovActiva.resp):''}</div>
+      </div>
+      <button onclick="closeModal();showPage('renovaciones')" style="background:var(--accent2);color:#0f0f13;border:none;padding:5px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap">Ver renovación →</button>
+    </div>`;
+  })() : '';
+
   // ── RENDER ──
   document.getElementById('modal-ttl').textContent = `#${r.ref} · ${r.e} · ID ${r.ib||'–'}`;
   document.getElementById('modal-body').innerHTML = `
+    ${renovBanner}
     <div class="tab-bar">
       <button class="tab-btn active" onclick="switchTab(event,'tab-unidad')">Unidad</button>
       <button class="tab-btn" onclick="switchTab(event,'tab-arren')">${r.ar?'Arrendatario':'Sin arrendatario'}</button>
@@ -2021,7 +2078,9 @@ function toast(title, msg, type='info') {
   const ct=document.getElementById('toast-ct');
   const el=document.createElement('div');
   el.className=`toast ${type}`;
-  el.innerHTML=`<div class="toast-title">${title}</div><div class="toast-msg">${msg}</div>`;
+  const ttl=document.createElement('div'); ttl.className='toast-title'; ttl.textContent=title;
+  const bod=document.createElement('div'); bod.className='toast-msg';   bod.textContent=msg;
+  el.appendChild(ttl); el.appendChild(bod);
   ct.appendChild(el);
   setTimeout(()=>{el.style.opacity='0';el.style.transition='opacity .3s';setTimeout(()=>el.remove(),300);},5000);
 }
