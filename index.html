@@ -861,10 +861,6 @@ document.addEventListener('DOMContentLoaded', function() {
             <input class="m-input" id="rp-tipo" placeholder="Tipo de póliza" style="width:100%">
           </div>
           <div>
-            <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:4px">Vencimiento</label>
-            <input class="m-input" type="date" id="rp-vence" style="width:100%">
-          </div>
-          <div>
             <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:4px">Etapa inicial</label>
             <select class="m-select" id="rp-etapa" style="width:100%">
               <option value="envio_correo">Correo de renovación enviado</option>
@@ -875,10 +871,10 @@ document.addEventListener('DOMContentLoaded', function() {
             <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:4px">Responsable</label>
             <input class="m-input" id="rp-resp" placeholder="Ej: Gaby, Noemí..." style="width:100%">
           </div>
-          <div>
-            <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:4px">Nota</label>
-            <input class="m-input" id="rp-nota" placeholder="Observación opcional" style="width:100%">
-          </div>
+        </div>
+        <div style="margin-bottom:12px">
+          <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:4px">Nota / Observación</label>
+          <input class="m-input" id="rp-nota" placeholder="Observación opcional" style="width:100%">
         </div>
         <div style="display:flex;gap:8px">
           <button class="btn-save" onclick="saveRenovPol()">Guardar</button>
@@ -2884,7 +2880,6 @@ function iniciarRenovPoliza(p) {
     document.getElementById('rp-numero').value  = p.numero   || '';
     document.getElementById('rp-aseg').value    = p.aseguradora || '';
     document.getElementById('rp-tipo').value    = p.tipo     || '';
-    document.getElementById('rp-vence').value   = p.fecha_vencimiento || '';
     document.getElementById('rp-etapa').value   = 'envio_correo';
   }, 50);
 }
@@ -2920,7 +2915,6 @@ function showAddRenovPol() {
   document.getElementById('rp-numero').value  = '';
   document.getElementById('rp-aseg').value    = '';
   document.getElementById('rp-tipo').value    = '';
-  document.getElementById('rp-vence').value   = '';
   document.getElementById('rp-etapa').value   = 'envio_correo';
   document.getElementById('rp-resp').value    = '';
   document.getElementById('rp-nota').value    = '';
@@ -2937,7 +2931,6 @@ function showAddRenovPol() {
       document.getElementById('rp-empresa').value = match.empresa;
       document.getElementById('rp-aseg').value    = match.aseguradora;
       document.getElementById('rp-tipo').value    = match.tipo;
-      document.getElementById('rp-vence').value   = match.fecha_vencimiento;
     }
   };
   document.getElementById('rp-empresa').oninput = function() {
@@ -2947,7 +2940,6 @@ function showAddRenovPol() {
       document.getElementById('rp-numero').value = matches[0].numero;
       document.getElementById('rp-aseg').value   = matches[0].aseguradora;
       document.getElementById('rp-tipo').value   = matches[0].tipo;
-      document.getElementById('rp-vence').value  = matches[0].fecha_vencimiento;
     }
     const filtNumeros = matches.length ? matches.map(p=>p.numero) : POLIZAS_DATA.map(p=>p.numero);
     document.getElementById('rp-numero-list').innerHTML = filtNumeros.map(n=>`<option value="${n}">`).join('');
@@ -2964,15 +2956,15 @@ async function saveRenovPol(editId) {
   const numero  = document.getElementById('rp-numero').value.trim();
   const aseg    = document.getElementById('rp-aseg').value.trim();
   const tipo    = document.getElementById('rp-tipo').value.trim();
-  const vence   = document.getElementById('rp-vence').value;
   const etapa   = document.getElementById('rp-etapa').value;
   const resp    = document.getElementById('rp-resp').value.trim();
   const nota    = document.getElementById('rp-nota').value.trim();
 
   if (!empresa || !numero) { toast('Error', 'Completa empresa y nº de póliza.', 'error'); return; }
 
-  const polRef   = POLIZAS_DATA.find(p => p.numero.toUpperCase() === numero.toUpperCase());
-  const estado_pol = polRef?.estado || '';
+  const polRef     = POLIZAS_DATA.find(p => p.numero.toUpperCase() === numero.toUpperCase());
+  const estado_pol = polRef?.estado            || '';
+  const vence      = polRef?.fecha_vencimiento || '';
 
   const doc = {
     empresa, numero, aseg, tipo, vence, etapa, resp, nota, estado_pol,
@@ -3042,7 +3034,6 @@ function openEditRenovPol(r) {
   document.getElementById('rp-numero').value  = r.numero;
   document.getElementById('rp-aseg').value    = r.aseg   || '';
   document.getElementById('rp-tipo').value    = r.tipo   || '';
-  document.getElementById('rp-vence').value   = r.vence  || '';
   document.getElementById('rp-etapa').value   = r.etapa;
   document.getElementById('rp-resp').value    = r.resp   || '';
   document.getElementById('rp-nota').value    = r.nota   || '';
