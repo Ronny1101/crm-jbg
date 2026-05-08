@@ -387,6 +387,10 @@ document.addEventListener('DOMContentLoaded', function() {
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10,9 9,9 8,9"/></svg>
         <span>Pólizas</span>
       </div>
+      <div class="nav-item" id="n-renov-polizas" onclick="showPage('renov-polizas')" title="Renovación de pólizas" style="display:none">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+        <span>Renov. Pólizas</span>
+      </div>
     </nav>
     <div class="sidebar-footer">
       <button class="btn-logout" onclick="doLogout()">Cerrar sesión</button>
@@ -700,6 +704,9 @@ document.addEventListener('DOMContentLoaded', function() {
           <button class="btn-export" onclick="exportRenovacionesCSV()">↓ Excel/CSV</button>
         </div>
 
+        <!-- Chips por responsable -->
+        <div id="rn-resp-chips" style="display:flex;gap:8px;flex-wrap:wrap;padding:10px 14px 2px;border-bottom:1px solid var(--border)"></div>
+
         <!-- Kanban / Lista -->
         <div id="rn-list" style="display:flex;flex-direction:column;gap:8px;padding:12px"></div>
       </div>
@@ -804,6 +811,107 @@ document.addEventListener('DOMContentLoaded', function() {
     </div>
   </div>
 </div>
+
+    <!-- RENOVACION POLIZAS (solo admin) -->
+    <div class="page" id="page-renov-polizas">
+      <div class="page-header" style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div>
+          <div class="page-title">Renovación de Pólizas</div>
+          <div class="page-sub">Seguimiento del proceso de renovación · envío de correo y recepción</div>
+        </div>
+        <button class="btn-save" onclick="showAddRenovPol()">+ Agregar renovación</button>
+      </div>
+
+      <!-- Flujo visual -->
+      <div style="background:var(--surface2);border-radius:12px;padding:16px 20px;margin-bottom:20px;overflow-x:auto">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:10px;font-weight:600">FLUJO DE RENOVACIÓN DE PÓLIZA</div>
+        <div style="display:flex;align-items:center;gap:0">
+          <div class="etapa-badge" data-etapa="envio_correo" style="--ec:#5e8fd4">
+            <div class="etapa-dot"></div>
+            <span>Correo enviado</span>
+          </div>
+          <div class="etapa-badge" data-etapa="recepcion" style="--ec:#4ade80">
+            <div class="etapa-dot"></div>
+            <span>Póliza recibida</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Panel agregar renovación -->
+      <div id="add-renpol-panel" style="display:none;background:var(--surface2);border:1px solid var(--accent);border-radius:12px;padding:20px;margin-bottom:20px">
+        <div style="font-size:14px;font-weight:600;color:var(--accent);margin-bottom:14px">Nueva renovación de póliza</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px">
+          <div>
+            <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:4px">Empresa</label>
+            <input class="m-input" id="rp-empresa" placeholder="Nombre empresa" list="rp-empresa-list" style="width:100%">
+            <datalist id="rp-empresa-list"></datalist>
+          </div>
+          <div>
+            <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:4px">Nº Póliza / Garantía</label>
+            <input class="m-input" id="rp-numero" placeholder="Nº de póliza" list="rp-numero-list" style="width:100%">
+            <datalist id="rp-numero-list"></datalist>
+          </div>
+          <div>
+            <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:4px">Aseguradora / Banco</label>
+            <input class="m-input" id="rp-aseg" placeholder="Aseguradora" style="width:100%">
+          </div>
+          <div>
+            <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:4px">Tipo</label>
+            <input class="m-input" id="rp-tipo" placeholder="Tipo de póliza" style="width:100%">
+          </div>
+          <div>
+            <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:4px">Vencimiento</label>
+            <input class="m-input" type="date" id="rp-vence" style="width:100%">
+          </div>
+          <div>
+            <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:4px">Etapa inicial</label>
+            <select class="m-select" id="rp-etapa" style="width:100%">
+              <option value="envio_correo">Correo de renovación enviado</option>
+              <option value="recepcion">Póliza recibida ✓</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:4px">Responsable</label>
+            <input class="m-input" id="rp-resp" placeholder="Ej: Gaby, Noemí..." style="width:100%">
+          </div>
+          <div>
+            <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:4px">Nota</label>
+            <input class="m-input" id="rp-nota" placeholder="Observación opcional" style="width:100%">
+          </div>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="btn-save" onclick="saveRenovPol()">Guardar</button>
+          <button class="btn-cancel" onclick="hideAddRenovPol()">Cancelar</button>
+        </div>
+      </div>
+
+      <!-- Filtros -->
+      <div class="table-card">
+        <div class="toolbar">
+          <div class="search-box">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input id="rp-search" placeholder="Buscar empresa, aseguradora, nº póliza..." oninput="renderRenovPolizas()">
+          </div>
+          <select class="flt" id="rp-filter-etapa" onchange="renderRenovPolizas()">
+            <option value="">Todas las etapas</option>
+            <option value="envio_correo">Correo enviado</option>
+            <option value="recepcion">Póliza recibida</option>
+          </select>
+          <select class="flt" id="rp-filter-estado" onchange="renderRenovPolizas()">
+            <option value="">Todos los estados</option>
+            <option value="VENCIDA">Vencidas</option>
+            <option value="POR VENCER">Por vencer</option>
+            <option value="VIGENTE">Vigentes</option>
+          </select>
+          <span class="tcount" id="rp-count">–</span>
+          <button class="btn-export" onclick="exportRenovPolCSV()">↓ Excel/CSV</button>
+        </div>
+        <!-- Chips por responsable -->
+        <div id="rp-resp-chips" style="display:flex;gap:8px;flex-wrap:wrap;padding:10px 14px 2px;border-bottom:1px solid var(--border)"></div>
+        <!-- Lista de tarjetas -->
+        <div id="rp-list" style="display:flex;flex-direction:column;gap:8px;padding:12px"></div>
+      </div>
+    </div>
 
 <!-- MODAL -->
 <div id="modal-bg" onclick="closeMBg(event)">
@@ -1010,6 +1118,9 @@ async function startApp() {
     const navRen = document.getElementById('n-renovaciones');
     if (navRen) navRen.style.display = 'flex';
     subscribeRenovaciones();
+    const navRenPol = document.getElementById('n-renov-polizas');
+    if (navRenPol) navRenPol.style.display = 'flex';
+    subscribeRenovPolizas();
   }
   // Render user info
   const u = currentUser;
@@ -1211,6 +1322,7 @@ function showPage(id) {
   if (id==='polizas') { renderPolKPIs(); filterPol(); }
   if (id==='usuarios') { renderUsuariosPage(); }
   if (id==='renovaciones') { renderRenovaciones(); }
+  if (id==='renov-polizas') { renderRenovPolizas(); }
 }
 
 // ══════════════════════════════════════════════
@@ -2575,9 +2687,11 @@ function exportRenovacionesCSV() {
 }
 
 var _mostrarNoRenueva = false;
+var _filtroResponsable = '';
 
 function toggleNoRenueva() {
   _mostrarNoRenueva = !_mostrarNoRenueva;
+  _filtroResponsable = '';
   const btn = document.getElementById('rn-toggle-norenueva');
   if (btn) {
     btn.textContent = _mostrarNoRenueva ? '👁 Ocultar no renuevan' : '👁 Ver no renuevan';
@@ -2611,15 +2725,65 @@ async function marcarNoRenueva(id, marcar) {
   } catch(e) { toast('Error', e.message, 'error'); }
 }
 
+function filtrarPorResponsable(resp) {
+  _filtroResponsable = (_filtroResponsable === resp) ? '' : resp;
+  renderRenovaciones();
+}
+
 function renderRenovaciones() {
-  const s = (document.getElementById('rn-search')?.value||'').toLowerCase();
+  const s  = (document.getElementById('rn-search')?.value||'').toLowerCase();
   const fe = document.getElementById('rn-filter-etapa')?.value||'';
 
+  // ── Chips por responsable ──────────────────────────
+  const activos = renovCache.filter(r => r.estado !== 'no_renueva');
+  const respMap  = {};
+  activos.forEach(r => {
+    const nombre = (r.resp||'').trim();
+    if (!nombre) return;
+    if (!respMap[nombre]) respMap[nombre] = { total: 0, completados: 0 };
+    respMap[nombre].total++;
+    if (ETAPAS.findIndex(e => e.id === r.etapa) === ETAPAS.length - 1) respMap[nombre].completados++;
+  });
+  const sinResp = activos.filter(r => !(r.resp||'').trim()).length;
+  const chipsEl = document.getElementById('rn-resp-chips');
+  if (chipsEl) {
+    const entradas = Object.entries(respMap).sort((a,b) => b[1].total - a[1].total);
+    if (!entradas.length && !sinResp) {
+      chipsEl.style.display = 'none';
+    } else {
+      chipsEl.style.display = 'flex';
+      chipsEl.innerHTML = (sinResp ? [['Sin asignar', { total: sinResp, completados: 0 }]] : [])
+        .concat(entradas)
+        .map(([nombre, d]) => {
+          const activo  = _filtroResponsable === nombre;
+          const pct     = d.total > 0 ? Math.round((d.completados / d.total) * 100) : 0;
+          const initials = nombre.split(' ').slice(0,2).map(w=>w[0]||'').join('').toUpperCase();
+          const colores  = ['#5e8fd4','#a78bfa','#f59e0b','#fb923c','#34d399','#f472b6','#60a5fa','#e8c068'];
+          const col      = nombre === 'Sin asignar' ? 'var(--muted)' : colores[Math.abs(nombre.split('').reduce((a,c)=>a+c.charCodeAt(0),0)) % colores.length];
+          return `<div onclick="filtrarPorResponsable('${nombre.replace(/'/g,"\\'")}')"
+            style="display:flex;align-items:center;gap:8px;padding:6px 12px;border-radius:20px;cursor:pointer;border:2px solid ${activo ? col : 'transparent'};background:${activo ? col+'22' : 'var(--surface2)'};transition:all .15s;user-select:none">
+            <div style="width:26px;height:26px;border-radius:50%;background:${col}30;border:1.5px solid ${col};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:${col};flex-shrink:0">${nombre==='Sin asignar'?'?':initials}</div>
+            <div>
+              <div style="font-size:12px;font-weight:600;color:${activo?col:'var(--text)'};white-space:nowrap">${esc(nombre)}</div>
+              <div style="font-size:10px;color:var(--muted)">${d.total} contrato${d.total!==1?'s':''}${d.completados?` · ${d.completados} ✓`:''}</div>
+            </div>
+            ${activo ? `<span style="font-size:11px;color:${col};font-weight:700">✕</span>` : ''}
+          </div>`;
+        }).join('');
+    }
+  }
+
+  // ── Filtrar tarjetas ───────────────────────────────
   let filtered = renovCache.filter(r => {
     const esNoRenueva = r.estado === 'no_renueva';
     if (!_mostrarNoRenueva && esNoRenueva) return false;
     if (_mostrarNoRenueva && !esNoRenueva) return false;
     if (fe && r.etapa !== fe) return false;
+    if (_filtroResponsable) {
+      const resp = (r.resp||'').trim();
+      if (_filtroResponsable === 'Sin asignar' && resp) return false;
+      if (_filtroResponsable !== 'Sin asignar' && resp !== _filtroResponsable) return false;
+    }
     if (s && !(r.arren||'').toLowerCase().includes(s) && !(r.bien||'').toLowerCase().includes(s) && !(r.resp||'').toLowerCase().includes(s) && !(r.nota||'').toLowerCase().includes(s) && !(r.nota_contrato||'').toLowerCase().includes(s)) return false;
     return true;
   });
@@ -2627,7 +2791,7 @@ function renderRenovaciones() {
   const noRenuevanCount = renovCache.filter(r => r.estado === 'no_renueva').length;
   const label = _mostrarNoRenueva
     ? `${filtered.length} no renuevan`
-    : `${filtered.length} activas${noRenuevanCount > 0 ? ` · ${noRenuevanCount} no renuevan` : ''}`;
+    : `${filtered.length} activas${_filtroResponsable ? ` · filtrando: ${_filtroResponsable}` : ''}${noRenuevanCount > 0 ? ` · ${noRenuevanCount} no renuevan` : ''}`;
   document.getElementById('rn-count').textContent = label;
 
   const container = document.getElementById('rn-list');
@@ -2703,6 +2867,325 @@ function renderRenovaciones() {
             : `<button onclick="marcarNoRenueva('${r.id}', true)" style="background:none;border:1px solid var(--orange);color:var(--orange);padding:4px 8px;border-radius:6px;font-size:11px;cursor:pointer" title="Marcar como no renueva">🚫 No renueva</button>`
           }
           <button onclick="deleteRenovacion('${r.id}')" style="background:none;border:1px solid var(--red);color:var(--red);padding:4px 8px;border-radius:6px;font-size:11px;cursor:pointer">✕</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ══════════════════════════════════════════════
+// RENOVACIÓN DE PÓLIZAS
+// ══════════════════════════════════════════════
+const ETAPAS_POL = [
+  {id:'envio_correo', label:'Correo de renovación enviado', color:'#5e8fd4'},
+  {id:'recepcion',    label:'Póliza recibida ✓',           color:'#4ade80'},
+];
+
+var renovPolCache = [];
+var unsubRenovPol = null;
+
+function subscribeRenovPolizas() {
+  if (!db) return;
+  if (unsubRenovPol) unsubRenovPol();
+  unsubRenovPol = db.collection('renovaciones_polizas')
+    .orderBy('ts', 'desc')
+    .onSnapshot(snap => {
+      renovPolCache = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      if (document.getElementById('page-renov-polizas')?.classList.contains('active')) {
+        renderRenovPolizas();
+      }
+    }, e => console.warn('renovaciones_polizas:', e));
+}
+
+function showAddRenovPol() {
+  const panel = document.getElementById('add-renpol-panel');
+  panel.style.display = 'block';
+  document.getElementById('rp-empresa').value = '';
+  document.getElementById('rp-numero').value  = '';
+  document.getElementById('rp-aseg').value    = '';
+  document.getElementById('rp-tipo').value    = '';
+  document.getElementById('rp-vence').value   = '';
+  document.getElementById('rp-etapa').value   = 'envio_correo';
+  document.getElementById('rp-resp').value    = '';
+  document.getElementById('rp-nota').value    = '';
+  const btn = document.querySelector('#add-renpol-panel .btn-save');
+  if (btn) { btn.textContent = 'Guardar'; btn.onclick = ()=>saveRenovPol(null); }
+  const empresas = [...new Set(POLIZAS_DATA.map(p=>p.empresa))].sort();
+  const numeros  = POLIZAS_DATA.map(p=>p.numero).sort();
+  document.getElementById('rp-empresa-list').innerHTML = empresas.map(e=>`<option value="${esc(e)}">`).join('');
+  document.getElementById('rp-numero-list').innerHTML  = numeros.map(n=>`<option value="${esc(n)}">`).join('');
+  document.getElementById('rp-numero').oninput = function() {
+    const num = this.value.trim().toUpperCase();
+    const match = POLIZAS_DATA.find(p => p.numero.toUpperCase() === num);
+    if (match) {
+      document.getElementById('rp-empresa').value = match.empresa;
+      document.getElementById('rp-aseg').value    = match.aseguradora;
+      document.getElementById('rp-tipo').value    = match.tipo;
+      document.getElementById('rp-vence').value   = match.fecha_vencimiento;
+    }
+  };
+  document.getElementById('rp-empresa').oninput = function() {
+    const emp = this.value.trim().toUpperCase();
+    const matches = POLIZAS_DATA.filter(p => p.empresa.toUpperCase() === emp);
+    if (matches.length === 1) {
+      document.getElementById('rp-numero').value = matches[0].numero;
+      document.getElementById('rp-aseg').value   = matches[0].aseguradora;
+      document.getElementById('rp-tipo').value   = matches[0].tipo;
+      document.getElementById('rp-vence').value  = matches[0].fecha_vencimiento;
+    }
+    const filtNumeros = matches.length ? matches.map(p=>p.numero) : POLIZAS_DATA.map(p=>p.numero);
+    document.getElementById('rp-numero-list').innerHTML = filtNumeros.map(n=>`<option value="${n}">`).join('');
+  };
+  panel.scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+
+function hideAddRenovPol() {
+  document.getElementById('add-renpol-panel').style.display = 'none';
+}
+
+async function saveRenovPol(editId) {
+  const empresa = document.getElementById('rp-empresa').value.trim();
+  const numero  = document.getElementById('rp-numero').value.trim();
+  const aseg    = document.getElementById('rp-aseg').value.trim();
+  const tipo    = document.getElementById('rp-tipo').value.trim();
+  const vence   = document.getElementById('rp-vence').value;
+  const etapa   = document.getElementById('rp-etapa').value;
+  const resp    = document.getElementById('rp-resp').value.trim();
+  const nota    = document.getElementById('rp-nota').value.trim();
+
+  if (!empresa || !numero) { toast('Error', 'Completa empresa y nº de póliza.', 'error'); return; }
+
+  const polRef   = POLIZAS_DATA.find(p => p.numero.toUpperCase() === numero.toUpperCase());
+  const estado_pol = polRef?.estado || '';
+
+  const doc = {
+    empresa, numero, aseg, tipo, vence, etapa, resp, nota, estado_pol,
+    ts: Date.now(),
+    creadoPor: currentUser.email,
+    estado: 'activo',
+    historial: [{ etapa, fecha: new Date().toISOString().slice(0,10), user: currentUser.email }],
+  };
+
+  try {
+    if (editId && editId !== null && editId !== 'null') {
+      const existing = renovPolCache.find(r=>r.id===editId);
+      const historial = existing?.historial || [];
+      if (!historial.find(h=>h.etapa===etapa)) {
+        historial.push({ etapa, fecha: new Date().toISOString().slice(0,10), user: currentUser.email });
+      }
+      await db.collection('renovaciones_polizas').doc(editId).update({ empresa, numero, aseg, tipo, vence, etapa, resp, nota, estado_pol, historial });
+      toast('Renovación actualizada', empresa, 'success');
+    } else {
+      await db.collection('renovaciones_polizas').add(doc);
+      toast('Renovación creada', empresa, 'success');
+    }
+    hideAddRenovPol();
+  } catch(e) { toast('Error', e.message, 'error'); }
+}
+
+async function avanzarEtapaPol(id, currentEtapaId) {
+  if (!isAdmin()) return;
+  const idx = ETAPAS_POL.findIndex(e=>e.id===currentEtapaId);
+  if (idx === ETAPAS_POL.length-1) { toast('Ya está en la etapa final', '', 'info'); return; }
+  const nextEtapa = ETAPAS_POL[idx+1];
+  try {
+    const existing = renovPolCache.find(r=>r.id===id);
+    const historial = existing?.historial || [];
+    historial.push({ etapa: nextEtapa.id, fecha: new Date().toISOString().slice(0,10), user: currentUser.email });
+    await db.collection('renovaciones_polizas').doc(id).update({ etapa: nextEtapa.id, historial });
+    toast('Etapa avanzada', nextEtapa.label, 'success');
+  } catch(e) { toast('Error', e.message, 'error'); }
+}
+
+async function retrocederEtapaPol(id, currentEtapaId) {
+  if (!isAdmin()) return;
+  const idx = ETAPAS_POL.findIndex(e=>e.id===currentEtapaId);
+  if (idx === 0) return;
+  const prevEtapa = ETAPAS_POL[idx-1];
+  try {
+    const existing = renovPolCache.find(r=>r.id===id);
+    const historial = existing?.historial || [];
+    historial.push({ etapa: prevEtapa.id, fecha: new Date().toISOString().slice(0,10), user: currentUser.email, accion: 'retroceso' });
+    await db.collection('renovaciones_polizas').doc(id).update({ etapa: prevEtapa.id, historial });
+    toast('Etapa retrocedida', prevEtapa.label, 'info');
+  } catch(e) { toast('Error', e.message, 'error'); }
+}
+
+async function deleteRenovPol(id) {
+  if (!isAdmin()) return;
+  if (!confirm('¿Eliminar esta renovación de póliza?')) return;
+  try {
+    await db.collection('renovaciones_polizas').doc(id).delete();
+    toast('Renovación eliminada', '', 'info');
+  } catch(e) { toast('Error', e.message, 'error'); }
+}
+
+function openEditRenovPol(r) {
+  showAddRenovPol();
+  document.getElementById('rp-empresa').value = r.empresa;
+  document.getElementById('rp-numero').value  = r.numero;
+  document.getElementById('rp-aseg').value    = r.aseg   || '';
+  document.getElementById('rp-tipo').value    = r.tipo   || '';
+  document.getElementById('rp-vence').value   = r.vence  || '';
+  document.getElementById('rp-etapa').value   = r.etapa;
+  document.getElementById('rp-resp').value    = r.resp   || '';
+  document.getElementById('rp-nota').value    = r.nota   || '';
+  const btn = document.querySelector('#add-renpol-panel .btn-save');
+  if (btn) { btn.textContent = 'Actualizar'; btn.onclick = ()=>saveRenovPol(r.id); }
+}
+
+function exportRenovPolCSV() {
+  if (!renovPolCache.length) { toast('Sin datos', 'No hay renovaciones para exportar.', 'info'); return; }
+  const heads = ['Empresa','Nº Póliza','Aseguradora','Tipo','Vencimiento','Estado Póliza','Etapa','Responsable','Nota'];
+  const rows = renovPolCache.map(r => {
+    const etapaLabel = ETAPAS_POL.find(e => e.id === r.etapa)?.label || r.etapa;
+    return [
+      r.empresa    || '',
+      r.numero     || '',
+      r.aseg       || '',
+      r.tipo       || '',
+      r.vence      || '',
+      r.estado_pol || '',
+      etapaLabel,
+      r.resp       || '',
+      r.nota       || '',
+    ].map(v => `"${String(v).replace(/"/g,'""')}"`).join(',');
+  });
+  const bom  = '\uFEFF';
+  const blob = new Blob([bom + [heads.join(','), ...rows].join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+  const a    = document.createElement('a');
+  a.href     = URL.createObjectURL(blob);
+  a.download = 'renovaciones_polizas.csv';
+  a.click();
+  toast('Exportado', renovPolCache.length + ' registros descargados', 'success');
+}
+
+var _filtroRespPol = '';
+
+function filtrarRespPol(resp) {
+  _filtroRespPol = (_filtroRespPol === resp) ? '' : resp;
+  renderRenovPolizas();
+}
+
+function renderRenovPolizas() {
+  const s    = (document.getElementById('rp-search')?.value||'').toLowerCase();
+  const fe   = document.getElementById('rp-filter-etapa')?.value||'';
+  const fest = document.getElementById('rp-filter-estado')?.value||'';
+
+  const activos = renovPolCache.filter(r => r.estado !== 'no_renueva');
+  const respMap = {};
+  activos.forEach(r => {
+    const nombre = (r.resp||'').trim();
+    if (!nombre) return;
+    if (!respMap[nombre]) respMap[nombre] = { total: 0, completados: 0 };
+    respMap[nombre].total++;
+    if (ETAPAS_POL.findIndex(e => e.id === r.etapa) === ETAPAS_POL.length - 1) respMap[nombre].completados++;
+  });
+  const sinResp = activos.filter(r => !(r.resp||'').trim()).length;
+  const chipsEl = document.getElementById('rp-resp-chips');
+  if (chipsEl) {
+    const entradas = Object.entries(respMap).sort((a,b) => b[1].total - a[1].total);
+    if (!entradas.length && !sinResp) {
+      chipsEl.style.display = 'none';
+    } else {
+      chipsEl.style.display = 'flex';
+      chipsEl.innerHTML = (sinResp ? [['Sin asignar', { total: sinResp, completados: 0 }]] : [])
+        .concat(entradas)
+        .map(([nombre, d]) => {
+          const activo   = _filtroRespPol === nombre;
+          const initials = nombre.split(' ').slice(0,2).map(w=>w[0]||'').join('').toUpperCase();
+          const colores  = ['#5e8fd4','#a78bfa','#f59e0b','#fb923c','#34d399','#f472b6','#60a5fa','#e8c068'];
+          const col      = nombre === 'Sin asignar' ? 'var(--muted)' : colores[Math.abs(nombre.split('').reduce((a,c)=>a+c.charCodeAt(0),0)) % colores.length];
+          return `<div onclick="filtrarRespPol('${nombre.replace(/'/g,"\\'")}')"
+            style="display:flex;align-items:center;gap:8px;padding:6px 12px;border-radius:20px;cursor:pointer;border:2px solid ${activo ? col : 'transparent'};background:${activo ? col+'22' : 'var(--surface2)'};transition:all .15s;user-select:none">
+            <div style="width:26px;height:26px;border-radius:50%;background:${col}30;border:1.5px solid ${col};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:${col};flex-shrink:0">${nombre==='Sin asignar'?'?':initials}</div>
+            <div>
+              <div style="font-size:12px;font-weight:600;color:${activo?col:'var(--text)'};white-space:nowrap">${esc(nombre)}</div>
+              <div style="font-size:10px;color:var(--muted)">${d.total} póliza${d.total!==1?'s':''}${d.completados?` · ${d.completados} ✓`:''}</div>
+            </div>
+            ${activo ? `<span style="font-size:11px;color:${col};font-weight:700">✕</span>` : ''}
+          </div>`;
+        }).join('');
+    }
+  }
+
+  let filtered = renovPolCache.filter(r => {
+    if (r.estado === 'no_renueva') return false;
+    if (fe   && r.etapa     !== fe)   return false;
+    if (fest && r.estado_pol !== fest) return false;
+    if (_filtroRespPol) {
+      const resp = (r.resp||'').trim();
+      if (_filtroRespPol === 'Sin asignar' && resp) return false;
+      if (_filtroRespPol !== 'Sin asignar' && resp !== _filtroRespPol) return false;
+    }
+    if (s && !(r.empresa||'').toLowerCase().includes(s) && !(r.numero||'').toLowerCase().includes(s) && !(r.aseg||'').toLowerCase().includes(s) && !(r.resp||'').toLowerCase().includes(s) && !(r.nota||'').toLowerCase().includes(s)) return false;
+    return true;
+  });
+
+  const cntEl = document.getElementById('rp-count');
+  if (cntEl) cntEl.textContent = `${filtered.length} renovacion${filtered.length!==1?'es':''}${_filtroRespPol?' · filtrando: '+_filtroRespPol:''}`;
+
+  const container = document.getElementById('rp-list');
+  if (!container) return;
+
+  if (!filtered.length) {
+    container.innerHTML = '<div class="no-data">No hay renovaciones de pólizas registradas. Usa "+ Agregar renovación" para comenzar.</div>';
+    return;
+  }
+
+  const estadoColors = {'VENCIDA':'var(--red)','POR VENCER':'var(--orange)','VIGENTE':'var(--green)'};
+
+  container.innerHTML = filtered.map(r => {
+    const etapa    = ETAPAS_POL.find(e=>e.id===r.etapa) || ETAPAS_POL[0];
+    const etapaIdx = ETAPAS_POL.findIndex(e=>e.id===r.etapa);
+    const isLast   = etapaIdx === ETAPAS_POL.length - 1;
+
+    const dots = ETAPAS_POL.map((e,i) =>
+      `<div class="rn-prog-dot ${i<etapaIdx?'done':i===etapaIdx?'active':''}" title="${e.label}"></div>`
+    ).join('');
+
+    let diasLabel = '';
+    if (r.vence) {
+      const dias  = Math.round((new Date(r.vence) - new Date()) / 86400000);
+      const color = dias < 0 ? 'var(--red)' : dias < 30 ? 'var(--orange)' : 'var(--green)';
+      diasLabel   = `<span style="font-size:11px;color:${color};font-weight:600">${dias < 0 ? 'Vencida' : dias+'d'}</span>`;
+    }
+
+    const estadoBadge = r.estado_pol
+      ? `<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:${(estadoColors[r.estado_pol]||'var(--muted)')+'22'};color:${estadoColors[r.estado_pol]||'var(--muted)'}">${esc(r.estado_pol)}</span>`
+      : '';
+
+    const historial = (r.historial||[]).map(h =>
+      `<div style="font-size:10px;color:var(--muted)">${esc(h.fecha)} · ${esc(ETAPAS_POL.find(e=>e.id===h.etapa)?.label||h.etapa)}${h.accion==='retroceso'?' ↩':''}${h.user?` <span style="opacity:0.6">(${esc(h.user)})</span>`:''}</div>`
+    ).join('');
+
+    return `
+    <div class="rn-card">
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap">
+          <div style="font-size:14px;font-weight:600">${esc(r.empresa)}</div>
+          <span class="rn-etapa-pill" style="background:${etapa.color}22;color:${etapa.color}">${esc(etapa.label)}</span>
+          ${estadoBadge}
+          ${diasLabel}
+          ${r.resp?`<span style="font-size:11px;color:var(--muted)">· ${esc(r.resp)}</span>`:''}
+        </div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:8px">Nº ${esc(r.numero)}${r.aseg?' · '+esc(r.aseg):''}${r.tipo?' · '+esc(r.tipo):''}${r.vence?' · Vence: '+esc(r.vence):''}</div>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
+          <div class="rn-prog" style="margin-top:0;flex:1">${dots}</div>
+          <span style="font-size:10px;color:var(--muted);white-space:nowrap;flex-shrink:0">${isLast ? '✓ Completado' : `Etapa ${etapaIdx+1} de ${ETAPAS_POL.length}`}</span>
+        </div>
+        ${r.nota?`<div style="margin-top:8px;padding:8px 12px;background:var(--accent)12;border-left:3px solid var(--accent);border-radius:0 6px 6px 0;display:flex;align-items:flex-start;gap:7px">
+          <span style="font-size:14px;flex-shrink:0;margin-top:1px">📌</span>
+          <div><div style="font-size:10px;color:var(--accent);font-weight:700;text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px">Nota</div><div style="font-size:12px;color:var(--text);line-height:1.5">${esc(r.nota)}</div></div>
+        </div>`:''}
+        ${historial?`<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border)"><div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;font-weight:600;margin-bottom:4px">Historial</div>${historial}</div>`:''}
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0;align-items:flex-end" onclick="event.stopPropagation()">
+        ${!isLast?`<button onclick="avanzarEtapaPol('${r.id}','${r.etapa}')" style="background:var(--accent);color:#0f0f13;border:none;padding:5px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap">→ Avanzar</button>`:'<span style="font-size:11px;color:var(--green);font-weight:600">✓ Completado</span>'}
+        ${etapaIdx>0?`<button onclick="retrocederEtapaPol('${r.id}','${r.etapa}')" style="background:none;border:1px solid var(--border);color:var(--muted);padding:4px 10px;border-radius:6px;font-size:11px;cursor:pointer">← Retroceder</button>`:''}
+        <div style="display:flex;gap:4px">
+          <button onclick="openEditRenovPol(${JSON.stringify(r).replace(/"/g,'&quot;')})" style="background:none;border:1px solid var(--border);color:var(--muted);padding:4px 8px;border-radius:6px;font-size:11px;cursor:pointer">✏</button>
+          <button onclick="deleteRenovPol('${r.id}')" style="background:none;border:1px solid var(--red);color:var(--red);padding:4px 8px;border-radius:6px;font-size:11px;cursor:pointer">✕</button>
         </div>
       </div>
     </div>`;
