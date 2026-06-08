@@ -2657,29 +2657,47 @@ async function saveContractDates() {
 // ── Exportar renovaciones a CSV (abre en Excel) ─
 function exportRenovacionesCSV() {
   if (!renovCache.length) { toast('Sin datos', 'No hay renovaciones para exportar.', 'info'); return; }
-  const heads = ['Arrendatario','Bien / Estructura','Vencimiento original','Etapa','Responsable','Nota','Inicio nuevo contrato','Fin nuevo contrato','Nota contrato','Nota por','Nota fecha','Estado'];
+  const SEP = ';';
+  const q   = v => '"' + String(v == null ? '' : v).replace(/"/g, '""').replace(/?
+/g, ' ') + '"';
+  const fechaExport = new Date().toLocaleDateString('es-EC', { day:'2-digit', month:'2-digit', year:'numeric' });
+  const heads = [
+    'Arrendatario','Bien / Estructura','Vencimiento contrato','Etapa actual',
+    'Progreso','Responsable','Estado renovacion','Nota general',
+    'Inicio nuevo contrato','Fin nuevo contrato','Nota contrato',
+    'Nota por','Fecha nota','Historial de etapas','Creado por',
+  ];
   const rows = renovCache.map(r => {
-    const etapaLabel = ETAPAS.find(e => e.id === r.etapa)?.label || r.etapa;
+    const etapaIdx   = ETAPAS.findIndex(e => e.id === r.etapa);
+    const etapaLabel = ETAPAS[etapaIdx]?.label || r.etapa;
+    const progreso   = 'Etapa ' + (etapaIdx + 1) + ' de ' + ETAPAS.length;
+    const hist       = (r.historial || [])
+      .map(h => h.fecha + ' - ' + (ETAPAS.find(e=>e.id===h.etapa)?.label||h.etapa) + (h.accion==='retroceso'?' (retroceso)':''))
+      .join(' | ');
     return [
-      r.arren            || '',
-      r.bien             || '',
-      r.vence            || '',
-      etapaLabel,
-      r.resp             || '',
-      r.nota             || '',
-      r.fecha_inicio_nuevo  || '',
-      r.fecha_fin_nuevo     || '',
-      r.nota_contrato       || '',
-      r.nota_contrato_por   || '',
-      r.nota_contrato_fecha || '',
+      r.arren || '', r.bien || '', r.vence || '',
+      etapaLabel, progreso, r.resp || '',
       r.estado === 'no_renueva' ? 'No renueva' : 'Activa',
-    ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(',');
+      r.nota || '', r.fecha_inicio_nuevo || '', r.fecha_fin_nuevo || '',
+      r.nota_contrato || '', r.nota_contrato_por || '', r.nota_contrato_fecha || '',
+      hist, r.creadoPor || '',
+    ].map(q).join(SEP);
   });
-  const bom  = '\uFEFF';
-  const blob = new Blob([bom + [heads.join(','), ...rows].join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+  const titulo = 'sep=' + SEP + '
+'
+    + 'REPORTE DE RENOVACIONES DE CONTRATOS
+'
+    + 'Fecha de exportacion' + SEP + fechaExport + '
+'
+    + 'Total registros' + SEP + renovCache.length + '
+
+';
+  const bom  = '﻿';
+  const blob = new Blob([bom + titulo + [heads.map(q).join(SEP), ...rows].join('
+')], { type: 'text/csv;charset=utf-8;' });
   const a    = document.createElement('a');
   a.href     = URL.createObjectURL(blob);
-  a.download = 'renovaciones_contratos.csv';
+  a.download = 'renovaciones_contratos_' + new Date().toISOString().slice(0,10) + '.csv';
   a.click();
   toast('Exportado', renovCache.length + ' registros descargados', 'success');
 }
@@ -3043,26 +3061,44 @@ function openEditRenovPol(r) {
 
 function exportRenovPolCSV() {
   if (!renovPolCache.length) { toast('Sin datos', 'No hay renovaciones para exportar.', 'info'); return; }
-  const heads = ['Empresa','Nº Póliza','Aseguradora','Tipo','Vencimiento','Estado Póliza','Etapa','Responsable','Nota'];
+  const SEP = ';';
+  const q   = v => '"' + String(v == null ? '' : v).replace(/"/g, '""').replace(/?
+/g, ' ') + '"';
+  const fechaExport = new Date().toLocaleDateString('es-EC', { day:'2-digit', month:'2-digit', year:'numeric' });
+  const heads = [
+    'Empresa','N Poliza / Garantia','Aseguradora / Banco','Tipo',
+    'Vencimiento poliza','Estado poliza','Etapa actual',
+    'Progreso','Responsable','Nota','Historial de etapas','Creado por',
+  ];
   const rows = renovPolCache.map(r => {
-    const etapaLabel = ETAPAS_POL.find(e => e.id === r.etapa)?.label || r.etapa;
+    const etapaIdx   = ETAPAS_POL.findIndex(e => e.id === r.etapa);
+    const etapaLabel = ETAPAS_POL[etapaIdx]?.label || r.etapa;
+    const progreso   = 'Etapa ' + (etapaIdx + 1) + ' de ' + ETAPAS_POL.length;
+    const hist       = (r.historial || [])
+      .map(h => h.fecha + ' - ' + (ETAPAS_POL.find(e=>e.id===h.etapa)?.label||h.etapa) + (h.accion==='retroceso'?' (retroceso)':''))
+      .join(' | ');
     return [
-      r.empresa    || '',
-      r.numero     || '',
-      r.aseg       || '',
-      r.tipo       || '',
-      r.vence      || '',
-      r.estado_pol || '',
-      etapaLabel,
-      r.resp       || '',
-      r.nota       || '',
-    ].map(v => `"${String(v).replace(/"/g,'""')}"`).join(',');
+      r.empresa || '', r.numero || '', r.aseg || '', r.tipo || '',
+      r.vence || '', r.estado_pol || '',
+      etapaLabel, progreso, r.resp || '', r.nota || '',
+      hist, r.creadoPor || '',
+    ].map(q).join(SEP);
   });
-  const bom  = '\uFEFF';
-  const blob = new Blob([bom + [heads.join(','), ...rows].join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+  const titulo = 'sep=' + SEP + '
+'
+    + 'REPORTE DE RENOVACION DE POLIZAS
+'
+    + 'Fecha de exportacion' + SEP + fechaExport + '
+'
+    + 'Total registros' + SEP + renovPolCache.length + '
+
+';
+  const bom  = '﻿';
+  const blob = new Blob([bom + titulo + [heads.map(q).join(SEP), ...rows].join('
+')], { type: 'text/csv;charset=utf-8;' });
   const a    = document.createElement('a');
   a.href     = URL.createObjectURL(blob);
-  a.download = 'renovaciones_polizas.csv';
+  a.download = 'renovaciones_polizas_' + new Date().toISOString().slice(0,10) + '.csv';
   a.click();
   toast('Exportado', renovPolCache.length + ' registros descargados', 'success');
 }
