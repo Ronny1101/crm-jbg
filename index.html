@@ -29,6 +29,7 @@ try {
 
 <!-- Charts -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
 <style>
 @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap');
@@ -2657,34 +2658,85 @@ async function saveContractDates() {
 // ── Exportar renovaciones a CSV (abre en Excel) ─
 function exportRenovacionesCSV() {
   if (!renovCache.length) { toast('Sin datos', 'No hay renovaciones para exportar.', 'info'); return; }
-  var SEP  = ';';
-  var NL   = '\r\n';
-  var q    = function(v) { return '"' + String(v == null ? '' : v).replace(/"/g, '""').replace(/[\r\n]+/g, ' ') + '"'; };
-  var hoy  = new Date().toLocaleDateString('es-EC', { day:'2-digit', month:'2-digit', year:'numeric' });
-  var heads = ['Arrendatario','Bien / Estructura','Vencimiento contrato','Etapa actual','Progreso','Responsable','Estado renovacion','Nota general','Inicio nuevo contrato','Fin nuevo contrato','Nota contrato','Nota por','Fecha nota','Historial de etapas','Creado por'];
-  var rows = renovCache.map(function(r) {
-    var idx  = ETAPAS.findIndex(function(e){ return e.id === r.etapa; });
+  if (typeof XLSX === 'undefined') { toast('Error', 'Librería XLSX no cargada.', 'error'); return; }
+
+  var hoy = new Date().toLocaleDateString('es-EC', { day:'2-digit', month:'2-digit', year:'numeric' });
+  var activas   = renovCache.filter(function(r){ return r.estado !== 'no_renueva'; });
+  var noRenuevan = renovCache.filter(function(r){ return r.estado === 'no_renueva'; });
+  var completadas = activas.filter(function(r){ return ETAPAS.findIndex(function(e){ return e.id===r.etapa; }) === ETAPAS.length-1; });
+
+  // ── Hoja 1: RESUMEN ─────────────────────────────────────────────
+  var resData = [
+    ['REPORTE DE RENOVACIONES DE CONTRATOS'],
+    [],
+    ['Fecha de exportación', hoy],
+    ['Total registros', renovCache.length],
+    ['Activas', activas.length],
+    ['Completadas', completadas.length],
+    ['No renuevan', noRenuevan.length],
+    [],
+    ['RESUMEN POR ETAPA'],
+    ['Etapa', 'Cantidad'],
+  ];
+  ETAPAS.forEach(function(e) {
+    var cnt = activas.filter(function(r){ return r.etapa === e.id; }).length;
+    if (cnt > 0) resData.push([e.label, cnt]);
+  });
+  resData.push([]);
+  resData.push(['RESUMEN POR RESPONSABLE']);
+  resData.push(['Responsable', 'Total', 'Completadas', '% Avance']);
+  var respMap = {};
+  activas.forEach(function(r) {
+    var n = (r.resp||'Sin asignar').trim();
+    if (!respMap[n]) respMap[n] = { total:0, comp:0 };
+    respMap[n].total++;
+    if (ETAPAS.findIndex(function(e){ return e.id===r.etapa; }) === ETAPAS.length-1) respMap[n].comp++;
+  });
+  Object.keys(respMap).sort().forEach(function(n) {
+    var d = respMap[n];
+    resData.push([n, d.total, d.comp, Math.round(d.comp/d.total*100)+'%']);
+  });
+
+  // ── Hoja 2: DETALLE ──────────────────────────────────────────────
+  var detHeaders = ['Arrendatario','Bien / Estructura','Vencimiento contrato',
+    'Etapa actual','Progreso','Responsable','Estado','Nota general',
+    'Inicio nuevo contrato','Fin nuevo contrato','Nota contrato',
+    'Nota por','Fecha nota','Historial','Creado por'];
+  var detData = [detHeaders];
+  renovCache.forEach(function(r) {
+    var idx  = ETAPAS.findIndex(function(e){ return e.id===r.etapa; });
     var lbl  = ETAPAS[idx] ? ETAPAS[idx].label : r.etapa;
-    var prog = 'Etapa ' + (idx+1) + ' de ' + ETAPAS.length;
     var hist = (r.historial||[]).map(function(h){
-      var el = ETAPAS.find(function(e){return e.id===h.etapa;});
+      var el = ETAPAS.find(function(e){ return e.id===h.etapa; });
       return h.fecha+' - '+(el?el.label:h.etapa)+(h.accion==='retroceso'?' (retroceso)':'');
     }).join(' | ');
-    return [r.arren||'',r.bien||'',r.vence||'',lbl,prog,r.resp||'',
+    detData.push([
+      r.arren||'', r.bien||'', r.vence||'', lbl,
+      'Etapa '+(idx+1)+' de '+ETAPAS.length,
+      r.resp||'',
       r.estado==='no_renueva'?'No renueva':'Activa',
-      r.nota||'',r.fecha_inicio_nuevo||'',r.fecha_fin_nuevo||'',
-      r.nota_contrato||'',r.nota_contrato_por||'',r.nota_contrato_fecha||'',
-      hist,r.creadoPor||''].map(q).join(SEP);
+      r.nota||'', r.fecha_inicio_nuevo||'', r.fecha_fin_nuevo||'',
+      r.nota_contrato||'', r.nota_contrato_por||'', r.nota_contrato_fecha||'',
+      hist, r.creadoPor||''
+    ]);
   });
-  var cab = 'sep='+SEP+NL+'REPORTE DE RENOVACIONES DE CONTRATOS'+NL
-    +'Fecha de exportacion'+SEP+hoy+NL+'Total registros'+SEP+renovCache.length+NL+NL;
-  var bom  = '\uFEFF';
-  var blob = new Blob([bom+cab+[heads.map(q).join(SEP)].concat(rows).join(NL)], {type:'text/csv;charset=utf-8;'});
-  var a    = document.createElement('a');
-  a.href   = URL.createObjectURL(blob);
-  a.download = 'renovaciones_contratos_'+new Date().toISOString().slice(0,10)+'.csv';
-  a.click();
-  toast('Exportado', renovCache.length+' registros descargados', 'success');
+
+  // ── Crear libro ──────────────────────────────────────────────────
+  var wb = XLSX.utils.book_new();
+
+  var wsRes = XLSX.utils.aoa_to_sheet(resData);
+  wsRes['!cols'] = [{wch:40},{wch:15},{wch:15},{wch:12}];
+  XLSX.utils.book_append_sheet(wb, wsRes, 'Resumen');
+
+  var wsDet = XLSX.utils.aoa_to_sheet(detData);
+  wsDet['!cols'] = [
+    {wch:28},{wch:30},{wch:18},{wch:36},{wch:16},{wch:16},
+    {wch:12},{wch:30},{wch:18},{wch:18},{wch:30},{wch:18},{wch:14},{wch:50},{wch:28}
+  ];
+  XLSX.utils.book_append_sheet(wb, wsDet, 'Detalle');
+
+  XLSX.writeFile(wb, 'renovaciones_contratos_'+new Date().toISOString().slice(0,10)+'.xlsx');
+  toast('Exportado', renovCache.length+' registros en Excel', 'success');
 }
 
 var _mostrarNoRenueva = false;
@@ -3046,32 +3098,85 @@ function openEditRenovPol(r) {
 
 function exportRenovPolCSV() {
   if (!renovPolCache.length) { toast('Sin datos', 'No hay renovaciones para exportar.', 'info'); return; }
-  var SEP  = ';';
-  var NL   = '\r\n';
-  var q    = function(v) { return '"' + String(v == null ? '' : v).replace(/"/g, '""').replace(/[\r\n]+/g, ' ') + '"'; };
-  var hoy  = new Date().toLocaleDateString('es-EC', { day:'2-digit', month:'2-digit', year:'numeric' });
-  var heads = ['Empresa','N Poliza / Garantia','Aseguradora / Banco','Tipo','Vencimiento poliza','Estado poliza','Etapa actual','Progreso','Responsable','Nota','Historial de etapas','Creado por'];
-  var rows = renovPolCache.map(function(r) {
-    var idx  = ETAPAS_POL.findIndex(function(e){ return e.id === r.etapa; });
+  if (typeof XLSX === 'undefined') { toast('Error', 'Librería XLSX no cargada.', 'error'); return; }
+
+  var hoy = new Date().toLocaleDateString('es-EC', { day:'2-digit', month:'2-digit', year:'numeric' });
+  var activas     = renovPolCache.filter(function(r){ return r.estado !== 'no_renueva'; });
+  var completadas = activas.filter(function(r){ return ETAPAS_POL.findIndex(function(e){ return e.id===r.etapa; }) === ETAPAS_POL.length-1; });
+
+  // ── Hoja 1: RESUMEN ──────────────────────────────────────────────
+  var resData = [
+    ['REPORTE DE RENOVACIÓN DE PÓLIZAS'],
+    [],
+    ['Fecha de exportación', hoy],
+    ['Total registros', renovPolCache.length],
+    ['En proceso', activas.length],
+    ['Completadas (póliza recibida)', completadas.length],
+    [],
+    ['RESUMEN POR ETAPA'],
+    ['Etapa', 'Cantidad'],
+  ];
+  ETAPAS_POL.forEach(function(e) {
+    var cnt = activas.filter(function(r){ return r.etapa === e.id; }).length;
+    resData.push([e.label, cnt]);
+  });
+  resData.push([]);
+  resData.push(['RESUMEN POR ESTADO DE PÓLIZA']);
+  resData.push(['Estado', 'Cantidad']);
+  ['VENCIDA','POR VENCER','VIGENTE'].forEach(function(est) {
+    resData.push([est, activas.filter(function(r){ return r.estado_pol===est; }).length]);
+  });
+  resData.push([]);
+  resData.push(['RESUMEN POR RESPONSABLE']);
+  resData.push(['Responsable', 'Total', 'Completadas', '% Avance']);
+  var respMap = {};
+  activas.forEach(function(r) {
+    var n = (r.resp||'Sin asignar').trim();
+    if (!respMap[n]) respMap[n] = { total:0, comp:0 };
+    respMap[n].total++;
+    if (ETAPAS_POL.findIndex(function(e){ return e.id===r.etapa; }) === ETAPAS_POL.length-1) respMap[n].comp++;
+  });
+  Object.keys(respMap).sort().forEach(function(n) {
+    var d = respMap[n];
+    resData.push([n, d.total, d.comp, Math.round(d.comp/d.total*100)+'%']);
+  });
+
+  // ── Hoja 2: DETALLE ──────────────────────────────────────────────
+  var detHeaders = ['Empresa','Nº Póliza / Garantía','Aseguradora / Banco','Tipo',
+    'Vencimiento póliza','Estado póliza','Etapa actual','Progreso',
+    'Responsable','Nota','Historial','Creado por'];
+  var detData = [detHeaders];
+  renovPolCache.forEach(function(r) {
+    var idx  = ETAPAS_POL.findIndex(function(e){ return e.id===r.etapa; });
     var lbl  = ETAPAS_POL[idx] ? ETAPAS_POL[idx].label : r.etapa;
-    var prog = 'Etapa ' + (idx+1) + ' de ' + ETAPAS_POL.length;
     var hist = (r.historial||[]).map(function(h){
-      var el = ETAPAS_POL.find(function(e){return e.id===h.etapa;});
+      var el = ETAPAS_POL.find(function(e){ return e.id===h.etapa; });
       return h.fecha+' - '+(el?el.label:h.etapa)+(h.accion==='retroceso'?' (retroceso)':'');
     }).join(' | ');
-    return [r.empresa||'',r.numero||'',r.aseg||'',r.tipo||'',
-      r.vence||'',r.estado_pol||'',lbl,prog,r.resp||'',r.nota||'',
-      hist,r.creadoPor||''].map(q).join(SEP);
+    detData.push([
+      r.empresa||'', r.numero||'', r.aseg||'', r.tipo||'',
+      r.vence||'', r.estado_pol||'', lbl,
+      'Etapa '+(idx+1)+' de '+ETAPAS_POL.length,
+      r.resp||'', r.nota||'', hist, r.creadoPor||''
+    ]);
   });
-  var cab = 'sep='+SEP+NL+'REPORTE DE RENOVACION DE POLIZAS'+NL
-    +'Fecha de exportacion'+SEP+hoy+NL+'Total registros'+SEP+renovPolCache.length+NL+NL;
-  var bom  = '\uFEFF';
-  var blob = new Blob([bom+cab+[heads.map(q).join(SEP)].concat(rows).join(NL)], {type:'text/csv;charset=utf-8;'});
-  var a    = document.createElement('a');
-  a.href   = URL.createObjectURL(blob);
-  a.download = 'renovaciones_polizas_'+new Date().toISOString().slice(0,10)+'.csv';
-  a.click();
-  toast('Exportado', renovPolCache.length+' registros descargados', 'success');
+
+  // ── Crear libro ──────────────────────────────────────────────────
+  var wb = XLSX.utils.book_new();
+
+  var wsRes = XLSX.utils.aoa_to_sheet(resData);
+  wsRes['!cols'] = [{wch:40},{wch:15},{wch:15},{wch:12}];
+  XLSX.utils.book_append_sheet(wb, wsRes, 'Resumen');
+
+  var wsDet = XLSX.utils.aoa_to_sheet(detData);
+  wsDet['!cols'] = [
+    {wch:28},{wch:22},{wch:24},{wch:24},{wch:18},{wch:14},
+    {wch:30},{wch:16},{wch:16},{wch:30},{wch:50},{wch:28}
+  ];
+  XLSX.utils.book_append_sheet(wb, wsDet, 'Detalle');
+
+  XLSX.writeFile(wb, 'renovaciones_polizas_'+new Date().toISOString().slice(0,10)+'.xlsx');
+  toast('Exportado', renovPolCache.length+' registros en Excel', 'success');
 }
 
 var _filtroRespPol = '';
