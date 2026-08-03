@@ -2693,7 +2693,7 @@ function exportRenovacionesCSV() {
     ['En proceso (DocuSign → Elaboración)', enProceso.length],
     ['Contrato listo (pendiente firmas / notarización)', contrListo.length],
     ['Renovado (Notarizado ✓)', renovados.length],
-    ['No renuevan', noRenuevan.length],
+    ['No renuevan (bienes)', noRenuevan.length],
     [],
     ['DETALLE POR ETAPA', 'Cantidad'],
   ];
@@ -2741,6 +2741,32 @@ function exportRenovacionesCSV() {
     {wch:12},{wch:30},{wch:18},{wch:18},{wch:30},{wch:18},{wch:14},{wch:55}
   ];
   XLSX.utils.book_append_sheet(wb, wsDet, 'Detalle');
+
+  // ── Hoja 3: NO RENUEVAN ───────────────────────────────────────────
+  var nrHeaders = ['Arrendatario','Bien / Estructura','Etapa al momento de salir','Nota','Historial'];
+  var nrData = [
+    ['ARRENDATARIOS / BIENES QUE NO RENUEVAN'],
+    ['Fecha de exportación', hoy],
+    ['Total no renuevan', noRenuevan.length],
+    [],
+    nrHeaders,
+  ];
+  // Ordenar por arrendatario para agrupar visualmente los bienes del mismo arrendatario
+  var nrOrdenado = noRenuevan.slice().sort(function(a,b){
+    return (a.arren||'').localeCompare(b.arren||'');
+  });
+  nrOrdenado.forEach(function(r) {
+    var lbl  = ETAPAS.find(function(e){ return e.id===r.etapa; });
+    var hist = (r.historial||[]).map(function(h){
+      var el = ETAPAS.find(function(e){ return e.id===h.etapa; });
+      return h.fecha+' - '+(el?el.label:h.etapa)+(h.accion==='no_renueva'?' (marcado no renueva)':h.accion==='retroceso'?' (retroceso)':'');
+    }).join(' | ');
+    nrData.push([r.arren||'', r.bien||'', lbl?lbl.label:r.etapa, r.nota||'', hist]);
+  });
+  if (!noRenuevan.length) nrData.push(['Sin registros marcados como No renueva','','','','']);
+  var wsNR = XLSX.utils.aoa_to_sheet(nrData);
+  wsNR['!cols'] = [{wch:32},{wch:34},{wch:36},{wch:30},{wch:60}];
+  XLSX.utils.book_append_sheet(wb, wsNR, 'No Renuevan');
 
   XLSX.writeFile(wb, 'renovaciones_contratos_'+new Date().toISOString().slice(0,10)+'.xlsx');
   toast('Exportado', renovCache.length+' registros en Excel', 'success');
