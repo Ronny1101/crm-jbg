@@ -2917,6 +2917,25 @@ function exportRenovacionesCSV() {
   wsVig['!cols'] = [{wch:8},{wch:30},{wch:22},{wch:12},{wch:12},{wch:10},{wch:14},{wch:14},{wch:14}];
   XLSX.utils.book_append_sheet(wb, wsVig, 'Vigentes');
 
+  // ── Hoja nueva: CONTRATOS VIGENTES (portafolio BASE_DATA) ────────────────
+  var cvHeaders = ['Ref','Arrendatario','Edificio','Tipo','Ident. bien','Área (m²)','Canon mensual','Vencimiento','Días restantes'];
+  var cvData = [
+    ['CONTRATOS VIGENTES DEL PORTAFOLIO — SIN RENOVACIÓN ACTIVA'],
+    ['Fecha de exportación', hoy],
+    ['Total contratos vigentes (vencen > 60 días)', bdVigentes.length],
+    [],
+    cvHeaders,
+  ];
+  var cvOrden = bdVigentes.slice().sort(function(a,b){ return new Date(a.fv)-new Date(b.fv); });
+  cvOrden.forEach(function(r){
+    var d = Math.round((new Date(r.fv)-bdHoy)/86400000);
+    cvData.push([r.ref||'', r.ar||'', r.e||'', r.tb||'', r.ib||'', r.a||'', r.cm||'', r.fv||'', d+' días']);
+  });
+  if (!bdVigentes.length) cvData.push(['Sin registros vigentes','','','','','','','','']);
+  var wsCV = XLSX.utils.aoa_to_sheet(cvData);
+  wsCV['!cols'] = [{wch:6},{wch:38},{wch:20},{wch:10},{wch:12},{wch:9},{wch:14},{wch:14},{wch:14}];
+  XLSX.utils.book_append_sheet(wb, wsCV, 'Contratos Vigentes');
+
   // ── Hoja 5: ALERTAS ───────────────────────────────────────────────
   var altHeaders = ['Urgencia','Arrendatario','Bien / Estructura',
     'Vencimiento','Días restantes','Etapa actual','Criterio','Responsable','Nota'];
