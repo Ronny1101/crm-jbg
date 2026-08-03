@@ -2683,6 +2683,9 @@ function exportRenovacionesCSV() {
   var activas    = renovCache.filter(function(r){ return r.estado !== 'no_renueva'; });
   var noRenuevan = renovCache.filter(function(r){ return r.estado === 'no_renueva'; });
   var renovados  = activas.filter(function(r){ return r.etapa === 'notariado'; });
+  var vigentesReales = activas.filter(function(r){ return r.vence && Math.round((new Date(r.vence)-new Date())/86400000) >= 0; });
+  var vencidosEnProceso = activas.filter(function(r){ return r.vence && Math.round((new Date(r.vence)-new Date())/86400000) < 0; });
+  var sinFechaVenc = activas.filter(function(r){ return !r.vence; });
   var contrListo = activas.filter(function(r){ return ['firma_ds','firma_arren','firma_jbg','pend_notarizar'].indexOf(r.etapa) > -1; });
   var enProceso  = activas.filter(function(r){ return ['docusign','cumplimiento','documentacion','gerencia','condiciones','elaboracion'].indexOf(r.etapa) > -1; });
 
@@ -2699,6 +2702,12 @@ function exportRenovacionesCSV() {
     ['— Contrato listo (pendiente firmas / notarización)', contrListo.length],
     ['— Renovado (Notarizado ✓)', renovados.length],
     ['No renuevan (bienes)', noRenuevan.length],
+    [],
+    ['ESTADO REAL DE CONTRATOS', 'Cantidad'],
+    ['Vigentes (contrato actual aún en curso)', vigentesReales.length],
+    ['Vencidos pero en proceso de renovación', vencidosEnProceso.length],
+    ['Sin fecha de vencimiento registrada', sinFechaVenc.length],
+    ['Total contratos vigentes + en proceso', activas.length],
     [],
     ['ESTIMADO DE AVANCE', 'Valor'],
     ['Contratos renovados', activas.length ? (renovados.length/activas.length*100).toFixed(1)+'%' : '0%'],
@@ -2807,33 +2816,51 @@ function exportRenovacionesCSV() {
     [],
     vigHeaders,
   ];
-  var vigCriterios = [
-    { label:'Renovado', ids:['notariado'] },
-    { label:'Contrato listo', ids:['firma_ds','firma_arren','firma_jbg','pend_notarizar'] },
-    { label:'En proceso', ids:['docusign','cumplimiento','documentacion','gerencia','condiciones','elaboracion'] },
-  ];
-  vigCriterios.forEach(function(grupo) {
-    var registros = vigOrdenado.filter(function(r){ return grupo.ids.indexOf(r.etapa) > -1; });
-    if (!registros.length) return;
-    vigData.push([grupo.label + ' — ' + registros.length + ' contrato(s)','','','','','','','','','']);
-    registros.forEach(function(r) {
-      var lbl  = ETAPAS.find(function(e){ return e.id===r.etapa; });
-      var crit = CRITERIO_RENOV[r.etapa] ? CRITERIO_RENOV[r.etapa].label : '';
-      var dias = '';
-      if (r.vence) {
-        var diasNum = Math.round((new Date(r.vence) - new Date()) / 86400000);
-        dias = diasNum < 0 ? 'VENCIDO' : diasNum === 0 ? 'HOY' : diasNum + ' días';
-      }
-      vigData.push([
-        r.arren||'', r.bien||'', crit,
-        lbl ? lbl.label : r.etapa,
-        r.vence||'', dias,
-        r.resp||'', r.nota||'',
-        r.fecha_inicio_nuevo||'', r.fecha_fin_nuevo||''
-      ]);
-    });
+  function vigRow(r) {
+    var lbl  = ETAPAS.find(function(e){ return e.id===r.etapa; });
+    var crit = CRITERIO_RENOV[r.etapa] ? CRITERIO_RENOV[r.etapa].label : '';
+    var dias = '';
+    if (r.vence) {
+      var diasNum = Math.round((new Date(r.vence) - new Date()) / 86400000);
+      dias = diasNum < 0 ? 'VENCIDO' : diasNum === 0 ? 'HOY' : diasNum + ' días';
+    }
+    return [r.arren||'', r.bien||'', crit, lbl?lbl.label:r.etapa, r.vence||'', dias, r.resp||'', r.nota||'', r.fecha_inicio_nuevo||'', r.fecha_fin_nuevo||''];
+  }
+
+  // ── Sección A: Contratos cuyo plazo AÚN NO ha vencido ─────────────────────
+  var vigRealesOrdenados = vigOrdenado.filter(function(r){ return r.vence && Math.round((new Date(r.vence)-new Date())/86400000) >= 0; });
+  vigRealesOrdenados.sort(function(a,b){ return new Date(a.vence)-new Date(b.vence); });
+  if (vigRealesOrdenados.length) {
+    vigData.push(['A. CONTRATOS VIGENTES (plazo aún en curso) — '+vigRealesOrdenados.length+' contratos','','','','','','','','','']);
+    vigRealesOrdenados.forEach(function(r){ vigData.push(vigRow(r)); });
     vigData.push([]);
-  });
+  }
+
+  // ── Sección B: Contratos ya vencidos pero con renovación en proceso ────────
+  var vencidosProcOrdenados = vigOrdenado.filter(function(r){ return r.vence && Math.round((new Date(r.vence)-new Date())/86400000) < 0 && r.etapa !== 'notariado'; });
+  vencidosProcOrdenados.sort(function(a,b){ return new Date(a.vence)-new Date(b.vence); });
+  if (vencidosProcOrdenados.length) {
+    vigData.push(['B. CONTRATOS VENCIDOS EN PROCESO DE RENOVACIÓN — '+vencidosProcOrdenados.length+' contratos','','','','','','','','','']);
+    vencidosProcOrdenados.forEach(function(r){ vigData.push(vigRow(r)); });
+    vigData.push([]);
+  }
+
+  // ── Sección C: Contratos renovados (notariados) ────────────────────────────
+  var renovadosOrdenados = vigOrdenado.filter(function(r){ return r.etapa === 'notariado'; });
+  renovadosOrdenados.sort(function(a,b){ return (a.arren||'').localeCompare(b.arren||''); });
+  if (renovadosOrdenados.length) {
+    vigData.push(['C. CONTRATOS RENOVADOS (Notariados ✓) — '+renovadosOrdenados.length+' contratos','','','','','','','','','']);
+    renovadosOrdenados.forEach(function(r){ vigData.push(vigRow(r)); });
+    vigData.push([]);
+  }
+
+  // ── Sección D: Sin fecha de vencimiento registrada ────────────────────────
+  var sinFechaOrdenados = vigOrdenado.filter(function(r){ return !r.vence && r.etapa !== 'notariado'; });
+  sinFechaOrdenados.sort(function(a,b){ return (a.arren||'').localeCompare(b.arren||''); });
+  if (sinFechaOrdenados.length) {
+    vigData.push(['D. SIN FECHA DE VENCIMIENTO REGISTRADA — '+sinFechaOrdenados.length+' contratos','','','','','','','','','']);
+    sinFechaOrdenados.forEach(function(r){ vigData.push(vigRow(r)); });
+  }
   var wsVig = XLSX.utils.aoa_to_sheet(vigData);
   wsVig['!cols'] = [{wch:30},{wch:32},{wch:20},{wch:36},{wch:18},{wch:14},{wch:16},{wch:30},{wch:16},{wch:16}];
   XLSX.utils.book_append_sheet(wb, wsVig, 'Vigentes');
