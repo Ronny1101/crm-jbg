@@ -653,6 +653,10 @@ document.addEventListener('DOMContentLoaded', function() {
         </div>
       </div>
 
+
+      <!-- Panel de alertas de vencimiento -->
+      <div id="rn-alertas-panel" style="margin-bottom:16px"></div>
+
       <!-- Panel agregar renovación -->
       <div id="add-renov-panel" style="display:none;background:var(--surface2);border:1px solid var(--accent);border-radius:12px;padding:20px;margin-bottom:20px">
         <div style="font-size:14px;font-weight:600;color:var(--accent);margin-bottom:14px">Nueva renovación</div>
@@ -2768,6 +2772,96 @@ function exportRenovacionesCSV() {
   wsNR['!cols'] = [{wch:32},{wch:34},{wch:36},{wch:30},{wch:60}];
   XLSX.utils.book_append_sheet(wb, wsNR, 'No Renuevan');
 
+    // ── Hoja 4: VIGENTES ─────────────────────────────────────────────
+  var vigHeaders = ['Arrendatario','Bien / Estructura','Criterio de renovación',
+    'Etapa actual','Vencimiento contrato','Días restantes',
+    'Responsable','Nota','Nuevo inicio','Nuevo fin'];
+  var prioridad = { 'notariado':0, 'firma_jbg':1, 'firma_arren':2, 'pend_notarizar':3,
+    'firma_ds':4, 'elaboracion':5, 'condiciones':6, 'gerencia':7,
+    'documentacion':8, 'cumplimiento':9, 'docusign':10 };
+  var vigOrdenado = activas.slice().sort(function(a,b){
+    var pa = prioridad[a.etapa] !== undefined ? prioridad[a.etapa] : 99;
+    var pb = prioridad[b.etapa] !== undefined ? prioridad[b.etapa] : 99;
+    if (pa !== pb) return pa - pb;
+    return (a.arren||'').localeCompare(b.arren||'');
+  });
+  var vigData = [
+    ['CONTRATOS VIGENTES EN PROCESO DE RENOVACIÓN'],
+    ['Fecha de exportación', hoy],
+    ['Total vigentes', activas.length],
+    [],
+    vigHeaders,
+  ];
+  vigOrdenado.forEach(function(r) {
+    var lbl  = ETAPAS.find(function(e){ return e.id===r.etapa; });
+    var crit = CRITERIO_RENOV[r.etapa] ? CRITERIO_RENOV[r.etapa].label : '';
+    var dias = '';
+    if (r.vence) {
+      var diasNum = Math.round((new Date(r.vence) - new Date()) / 86400000);
+      dias = diasNum < 0 ? 'VENCIDO' : diasNum === 0 ? 'HOY' : diasNum + ' días';
+    }
+    vigData.push([
+      r.arren||'', r.bien||'', crit,
+      lbl ? lbl.label : r.etapa,
+      r.vence||'', dias,
+      r.resp||'', r.nota||'',
+      r.fecha_inicio_nuevo||'', r.fecha_fin_nuevo||''
+    ]);
+  });
+  var wsVig = XLSX.utils.aoa_to_sheet(vigData);
+  wsVig['!cols'] = [{wch:30},{wch:32},{wch:20},{wch:36},{wch:18},{wch:14},{wch:16},{wch:30},{wch:16},{wch:16}];
+  XLSX.utils.book_append_sheet(wb, wsVig, 'Vigentes');
+
+  // ── Hoja 5: ALERTAS ───────────────────────────────────────────────
+  var altHeaders = ['Urgencia','Arrendatario','Bien / Estructura',
+    'Vencimiento','Días restantes','Etapa actual','Criterio','Responsable','Nota'];
+  var urgencias = [
+    { key:'VENCIDO',  min:-9999, max:-1,   label:'VENCIDO' },
+    { key:'CRITICO',  min:0,     max:14,   label:'CRÍTICO (0-14 días)' },
+    { key:'URGENTE',  min:15,    max:29,   label:'URGENTE (15-29 días)' },
+    { key:'PROXIMO',  min:30,    max:59,   label:'PRÓXIMO (30-59 días)' },
+    { key:'VIGENTE',  min:60,    max:9999, label:'VIGENTE (60+ días)' },
+  ];
+  var porVencer = activas.filter(function(r){ return r.etapa !== 'notariado' && r.vence; });
+  porVencer.sort(function(a,b){ return new Date(a.vence) - new Date(b.vence); });
+  var altData = [
+    ['ALERTAS DE VENCIMIENTO - CONTRATOS SIN RENOVAR'],
+    ['Fecha de exportación', hoy],
+    [],
+    ['RESUMEN DE ALERTAS',''],
+  ];
+  urgencias.forEach(function(u) {
+    var cnt = porVencer.filter(function(r){
+      var d = Math.round((new Date(r.vence)-new Date())/86400000);
+      return d >= u.min && d <= u.max;
+    }).length;
+    if (cnt > 0) altData.push([u.label, cnt]);
+  });
+  altData.push([]);
+  altData.push(altHeaders);
+  urgencias.forEach(function(u) {
+    var grupo = porVencer.filter(function(r){
+      var d = Math.round((new Date(r.vence)-new Date())/86400000);
+      return d >= u.min && d <= u.max;
+    });
+    if (!grupo.length) return;
+    altData.push([u.label,'','','','','','','','']);
+    grupo.forEach(function(r) {
+      var dias = Math.round((new Date(r.vence)-new Date())/86400000);
+      var lbl  = ETAPAS.find(function(e){ return e.id===r.etapa; });
+      var crit = CRITERIO_RENOV[r.etapa] ? CRITERIO_RENOV[r.etapa].label : '';
+      altData.push([
+        u.key, r.arren||'', r.bien||'',
+        r.vence, dias < 0 ? 'VENCIDO' : dias+'',
+        lbl ? lbl.label : r.etapa, crit, r.resp||'', r.nota||''
+      ]);
+    });
+  });
+  if (!porVencer.length) altData.push(['Sin alertas pendientes','','','','','','','','']);
+  var wsAlt = XLSX.utils.aoa_to_sheet(altData);
+  wsAlt['!cols'] = [{wch:14},{wch:30},{wch:32},{wch:14},{wch:14},{wch:36},{wch:18},{wch:16},{wch:30}];
+  XLSX.utils.book_append_sheet(wb, wsAlt, 'Alertas');
+
   XLSX.writeFile(wb, 'renovaciones_contratos_'+new Date().toISOString().slice(0,10)+'.xlsx');
   toast('Exportado', renovCache.length+' registros en Excel', 'success');
 }
@@ -2816,7 +2910,59 @@ function filtrarPorResponsable(resp) {
   renderRenovaciones();
 }
 
+function renderRenovAlertasPanel() {
+  var panel = document.getElementById('rn-alertas-panel');
+  if (!panel) return;
+  var activas = renovCache.filter(function(r){ return r.estado !== 'no_renueva' && r.etapa !== 'notariado' && r.vence; });
+  var vencidos  = activas.filter(function(r){ return Math.round((new Date(r.vence)-new Date())/86400000) < 0; });
+  var criticos  = activas.filter(function(r){ var d=Math.round((new Date(r.vence)-new Date())/86400000); return d>=0&&d<=14; });
+  var urgentes  = activas.filter(function(r){ var d=Math.round((new Date(r.vence)-new Date())/86400000); return d>=15&&d<=29; });
+  var proximos  = activas.filter(function(r){ var d=Math.round((new Date(r.vence)-new Date())/86400000); return d>=30&&d<=59; });
+
+  if (!vencidos.length && !criticos.length && !urgentes.length && !proximos.length) {
+    panel.innerHTML = '';
+    return;
+  }
+
+  function grupoHtml(lista, bg, color, titulo, icono) {
+    if (!lista.length) return '';
+    var items = lista.map(function(r) {
+      var dias = Math.round((new Date(r.vence)-new Date())/86400000);
+      var diasTxt = dias < 0 ? 'Vencido hace '+Math.abs(dias)+' días' : dias===0?'Vence HOY':'Vence en '+dias+' días';
+      var etiqEtapa = ETAPAS.find(function(e){return e.id===r.etapa;});
+      var crit = CRITERIO_RENOV[r.etapa]?CRITERIO_RENOV[r.etapa].label:'';
+      return '<div style="display:flex;align-items:flex-start;gap:12px;padding:8px 0;border-bottom:1px solid '+color+'25">'
+        +'<div style="flex:1;min-width:0">'
+        +'<div style="font-size:12px;font-weight:600;color:var(--text)">'+(r.arren||'')+'</div>'
+        +'<div style="font-size:11px;color:var(--muted)">'+(r.bien||'')+'</div>'
+        +'<div style="display:flex;gap:6px;margin-top:3px;flex-wrap:wrap">'
+        +(etiqEtapa?'<span style="font-size:10px;padding:1px 7px;border-radius:8px;background:'+etiqEtapa.color+'22;color:'+etiqEtapa.color+'">'+etiqEtapa.label+'</span>':'')
+        +(crit?'<span style="font-size:10px;padding:1px 7px;border-radius:8px;background:'+color+'22;color:'+color+'">'+crit+'</span>':'')
+        +(r.resp?'<span style="font-size:10px;color:var(--muted)">· '+(r.resp)+'</span>':'')
+        +'</div></div>'
+        +'<div style="font-size:11px;font-weight:700;color:'+color+';white-space:nowrap;text-align:right">'
+        +diasTxt+'<br><span style="font-size:10px;font-weight:400;color:var(--muted)">'+(r.vence||'')+'</span></div>'
+        +'</div>';
+    }).join('');
+    return '<details style="background:'+bg+';border:1px solid '+color+'44;border-radius:10px;padding:12px 16px;margin-bottom:8px" open>'
+      +'<summary style="cursor:pointer;font-size:12px;font-weight:700;color:'+color+';list-style:none;display:flex;align-items:center;gap:8px">'
+      +icono+' '+titulo+' <span style="background:'+color+';color:#fff;border-radius:10px;padding:1px 8px;font-size:11px">'+lista.length+'</span>'
+      +'<span style="margin-left:auto;font-size:10px;opacity:0.6">clic para colapsar</span></summary>'
+      +'<div style="margin-top:10px">'+items+'</div>'
+      +'</details>';
+  }
+
+  panel.innerHTML =
+    '<div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Alertas de vencimiento</div>'
+    + grupoHtml(vencidos, 'var(--red)12', 'var(--red)', 'Contratos VENCIDOS sin renovar', '🔴')
+    + grupoHtml(criticos, 'var(--orange)12', 'var(--orange)', 'Vencen en 0-14 días — CRÍTICO', '🟠')
+    + grupoHtml(urgentes, '#f59e0b12', '#f59e0b', 'Vencen en 15-29 días — URGENTE', '🟡')
+    + grupoHtml(proximos, 'var(--accent)10', 'var(--accent)', 'Vencen en 30-59 días — PRÓXIMO', '🔵');
+}
+
+
 function renderRenovaciones() {
+  renderRenovAlertasPanel();
   const s  = (document.getElementById('rn-search')?.value||'').toLowerCase();
   const fe = document.getElementById('rn-filter-etapa')?.value||'';
 
