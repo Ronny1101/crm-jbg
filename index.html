@@ -2472,6 +2472,21 @@ const ETAPAS = [
   {id:'notariado',    label:'Notarizado ✓',                         color:'#4ade80'},
 ];
 
+// Criterio de renovación por etapa
+var CRITERIO_RENOV = {
+  docusign:      { label:'En proceso',         color:'#60a5fa' },
+  cumplimiento:  { label:'En proceso',         color:'#60a5fa' },
+  documentacion: { label:'En proceso',         color:'#60a5fa' },
+  gerencia:      { label:'En proceso',         color:'#60a5fa' },
+  condiciones:   { label:'En proceso',         color:'#60a5fa' },
+  elaboracion:   { label:'En proceso',         color:'#60a5fa' },
+  firma_ds:      { label:'Contrato listo',     color:'#f59e0b' },
+  firma_arren:   { label:'Contrato listo',     color:'#f59e0b' },
+  firma_jbg:     { label:'Contrato listo',     color:'#f59e0b' },
+  pend_notarizar:{ label:'Contrato listo',     color:'#f59e0b' },
+  notariado:     { label:'Renovado',           color:'#4ade80' },
+};
+
 var renovCache = [];
 var unsubRenov = null;
 
@@ -2661,77 +2676,69 @@ function exportRenovacionesCSV() {
   if (typeof XLSX === 'undefined') { toast('Error', 'Librería XLSX no cargada.', 'error'); return; }
 
   var hoy = new Date().toLocaleDateString('es-EC', { day:'2-digit', month:'2-digit', year:'numeric' });
-  var activas   = renovCache.filter(function(r){ return r.estado !== 'no_renueva'; });
+  var activas    = renovCache.filter(function(r){ return r.estado !== 'no_renueva'; });
   var noRenuevan = renovCache.filter(function(r){ return r.estado === 'no_renueva'; });
-  var completadas = activas.filter(function(r){ return ETAPAS.findIndex(function(e){ return e.id===r.etapa; }) === ETAPAS.length-1; });
+  var renovados  = activas.filter(function(r){ return r.etapa === 'notariado'; });
+  var contrListo = activas.filter(function(r){ return ['firma_ds','firma_arren','firma_jbg','pend_notarizar'].indexOf(r.etapa) > -1; });
+  var enProceso  = activas.filter(function(r){ return ['docusign','cumplimiento','documentacion','gerencia','condiciones','elaboracion'].indexOf(r.etapa) > -1; });
 
-  // ── Hoja 1: RESUMEN ─────────────────────────────────────────────
+  // ── Hoja 1: RESUMEN ──────────────────────────────────────────────
   var resData = [
     ['REPORTE DE RENOVACIONES DE CONTRATOS'],
     [],
     ['Fecha de exportación', hoy],
     ['Total registros', renovCache.length],
-    ['Activas', activas.length],
-    ['Completadas', completadas.length],
+    [],
+    ['CRITERIO DE RENOVACIÓN', 'Cantidad'],
+    ['En proceso (DocuSign → Elaboración)', enProceso.length],
+    ['Contrato listo (pendiente firmas / notarización)', contrListo.length],
+    ['Renovado (Notarizado ✓)', renovados.length],
     ['No renuevan', noRenuevan.length],
     [],
-    ['RESUMEN POR ETAPA'],
-    ['Etapa', 'Cantidad'],
+    ['DETALLE POR ETAPA', 'Cantidad'],
   ];
   ETAPAS.forEach(function(e) {
     var cnt = activas.filter(function(r){ return r.etapa === e.id; }).length;
-    if (cnt > 0) resData.push([e.label, cnt]);
-  });
-  resData.push([]);
-  resData.push(['RESUMEN POR RESPONSABLE']);
-  resData.push(['Responsable', 'Total', 'Completadas', '% Avance']);
-  var respMap = {};
-  activas.forEach(function(r) {
-    var n = (r.resp||'Sin asignar').trim();
-    if (!respMap[n]) respMap[n] = { total:0, comp:0 };
-    respMap[n].total++;
-    if (ETAPAS.findIndex(function(e){ return e.id===r.etapa; }) === ETAPAS.length-1) respMap[n].comp++;
-  });
-  Object.keys(respMap).sort().forEach(function(n) {
-    var d = respMap[n];
-    resData.push([n, d.total, d.comp, Math.round(d.comp/d.total*100)+'%']);
+    if (cnt > 0) {
+      var crit = CRITERIO_RENOV[e.id] ? ' [' + CRITERIO_RENOV[e.id].label + ']' : '';
+      resData.push([e.label + crit, cnt]);
+    }
   });
 
   // ── Hoja 2: DETALLE ──────────────────────────────────────────────
-  var detHeaders = ['Arrendatario','Bien / Estructura','Vencimiento contrato',
-    'Etapa actual','Progreso','Responsable','Estado','Nota general',
-    'Inicio nuevo contrato','Fin nuevo contrato','Nota contrato',
-    'Nota por','Fecha nota','Historial','Creado por'];
+  var detHeaders = ['Arrendatario','Bien / Estructura','Criterio de renovación',
+    'Etapa actual','Estado renovación','Nota general',
+    'Inicio nuevo contrato','Fin nuevo contrato',
+    'Nota contrato','Nota por','Fecha nota','Historial'];
   var detData = [detHeaders];
   renovCache.forEach(function(r) {
     var idx  = ETAPAS.findIndex(function(e){ return e.id===r.etapa; });
     var lbl  = ETAPAS[idx] ? ETAPAS[idx].label : r.etapa;
+    var crit = CRITERIO_RENOV[r.etapa] ? CRITERIO_RENOV[r.etapa].label : '';
     var hist = (r.historial||[]).map(function(h){
       var el = ETAPAS.find(function(e){ return e.id===h.etapa; });
       return h.fecha+' - '+(el?el.label:h.etapa)+(h.accion==='retroceso'?' (retroceso)':'');
     }).join(' | ');
     detData.push([
-      r.arren||'', r.bien||'', r.vence||'', lbl,
-      'Etapa '+(idx+1)+' de '+ETAPAS.length,
-      r.resp||'',
+      r.arren||'', r.bien||'', crit, lbl,
       r.estado==='no_renueva'?'No renueva':'Activa',
       r.nota||'', r.fecha_inicio_nuevo||'', r.fecha_fin_nuevo||'',
       r.nota_contrato||'', r.nota_contrato_por||'', r.nota_contrato_fecha||'',
-      hist, r.creadoPor||''
+      hist
     ]);
   });
 
-  // ── Crear libro ──────────────────────────────────────────────────
+  // ── Crear libro ───────────────────────────────────────────────────
   var wb = XLSX.utils.book_new();
 
   var wsRes = XLSX.utils.aoa_to_sheet(resData);
-  wsRes['!cols'] = [{wch:40},{wch:15},{wch:15},{wch:12}];
+  wsRes['!cols'] = [{wch:50},{wch:12}];
   XLSX.utils.book_append_sheet(wb, wsRes, 'Resumen');
 
   var wsDet = XLSX.utils.aoa_to_sheet(detData);
   wsDet['!cols'] = [
-    {wch:28},{wch:30},{wch:18},{wch:36},{wch:16},{wch:16},
-    {wch:12},{wch:30},{wch:18},{wch:18},{wch:30},{wch:18},{wch:14},{wch:50},{wch:28}
+    {wch:28},{wch:30},{wch:20},{wch:36},
+    {wch:12},{wch:30},{wch:18},{wch:18},{wch:30},{wch:18},{wch:14},{wch:55}
   ];
   XLSX.utils.book_append_sheet(wb, wsDet, 'Detalle');
 
@@ -2887,6 +2894,7 @@ function renderRenovaciones() {
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap">
           <div style="font-size:14px;font-weight:600">${esc(r.arren)}</div>
           <span class="rn-etapa-pill" style="background:${etapa.color}22;color:${etapa.color}">${esc(etapa.label)}</span>
+          ${(function(){ var c=CRITERIO_RENOV[r.etapa]; return c?'<span style="font-size:10px;font-weight:700;padding:2px 9px;border-radius:10px;background:'+c.color+'22;color:'+c.color+';border:1px solid '+c.color+'55">'+c.label+'</span>':''; })()}
           ${diasLabel}
           ${r.resp?`<span style="font-size:11px;color:var(--muted)">· ${esc(r.resp)}</span>`:''}
           <span style="font-size:10px;color:var(--accent);opacity:0.7;margin-left:auto">📋 clic para editar fechas/notas</span>
