@@ -2741,8 +2741,8 @@ function exportRenovacionesCSV() {
 
   // ── Hoja 2: DETALLE ──────────────────────────────────────────────
   var detHeaders = ['Arrendatario','Bien / Estructura','Criterio de renovación',
-    'Etapa actual','Estado renovación','Nota general',
-    'Inicio nuevo contrato','Fin nuevo contrato',
+    'Etapa actual','Estado renovación','Vencimiento contrato','Días restantes',
+    'Nota general','Inicio nuevo contrato','Fin nuevo contrato',
     'Nota contrato','Nota por','Fecha nota','Historial'];
   var detData = [detHeaders];
   renovCache.forEach(function(r) {
