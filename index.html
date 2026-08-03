@@ -2686,6 +2686,15 @@ function exportRenovacionesCSV() {
   var vigentesReales = activas.filter(function(r){ return r.vence && Math.round((new Date(r.vence)-new Date())/86400000) >= 0; });
   var vencidosEnProceso = activas.filter(function(r){ return r.vence && Math.round((new Date(r.vence)-new Date())/86400000) < 0; });
   var sinFechaVenc = activas.filter(function(r){ return !r.vence; });
+
+  // Contratos del portafolio BASE_DATA
+  var bdData = (typeof getData === 'function') ? getData() : [];
+  var bdHoy  = new Date(); bdHoy.setHours(0,0,0,0);
+  var renovActivosSet = new Set((activas).map(function(rv){ return (rv.arren||'').toUpperCase().trim(); }));
+  var bdConFecha  = bdData.filter(function(r){ return r.fv && r.d === 'ALQUILADO'; });
+  var bdVigentes  = bdConFecha.filter(function(r){ return (new Date(r.fv)-bdHoy)/86400000 > 60 && !renovActivosSet.has((r.ar||'').toUpperCase().trim()); });
+  var bdPorRenov  = bdConFecha.filter(function(r){ var d=(new Date(r.fv)-bdHoy)/86400000; return d>=0&&d<=60 && !renovActivosSet.has((r.ar||'').toUpperCase().trim()); });
+  var bdVencidos2 = bdConFecha.filter(function(r){ return (new Date(r.fv)-bdHoy)/86400000 < 0 && !renovActivosSet.has((r.ar||'').toUpperCase().trim()); });
   var contrListo = activas.filter(function(r){ return ['firma_ds','firma_arren','firma_jbg','pend_notarizar'].indexOf(r.etapa) > -1; });
   var enProceso  = activas.filter(function(r){ return ['docusign','cumplimiento','documentacion','gerencia','condiciones','elaboracion'].indexOf(r.etapa) > -1; });
 
@@ -2703,11 +2712,15 @@ function exportRenovacionesCSV() {
     ['— Renovado (Notarizado ✓)', renovados.length],
     ['No renuevan (bienes)', noRenuevan.length],
     [],
-    ['ESTADO REAL DE CONTRATOS', 'Cantidad'],
-    ['Vigentes (contrato actual aún en curso)', vigentesReales.length],
-    ['Vencidos pero en proceso de renovación', vencidosEnProceso.length],
-    ['Sin fecha de vencimiento registrada', sinFechaVenc.length],
-    ['Total contratos vigentes + en proceso', activas.length],
+    ['ESTADO REAL DEL PORTAFOLIO', 'Cantidad'],
+    ['Vigentes sin renovación activa (vence > 60 días)', bdVigentes.length],
+    ['Por renovar sin proceso activo (vence ≤ 60 días)', bdPorRenov.length],
+    ['Vencidos sin proceso activo', bdVencidos2.length],
+    [],
+    ['EN PROCESO DE RENOVACIÓN (flujo)', activas.length],
+    ['— Contrato vigente (aún en curso)', vigentesReales.length],
+    ['— Contrato vencido en proceso', vencidosEnProceso.length],
+    ['— Sin fecha registrada', sinFechaVenc.length],
     [],
     ['ESTIMADO DE AVANCE', 'Valor'],
     ['Contratos renovados', activas.length ? (renovados.length/activas.length*100).toFixed(1)+'%' : '0%'],
@@ -2809,13 +2822,52 @@ function exportRenovacionesCSV() {
     if (pa !== pb) return pa - pb;
     return (a.arren||'').localeCompare(b.arren||'');
   });
+  // Columnas BASE_DATA
+  var bdHeaders = ['Ref','Arrendatario','Edificio','Tipo','Ident. bien','Área (m²)','Canon mensual','Vencimiento','Días restantes'];
+
   var vigData = [
-    ['CONTRATOS VIGENTES EN PROCESO DE RENOVACIÓN'],
+    ['CONTRATOS DEL PORTAFOLIO — ESTADO REAL DE VENCIMIENTOS'],
     ['Fecha de exportación', hoy],
-    ['Total vigentes', activas.length],
     [],
-    vigHeaders,
   ];
+
+  // ── Sección 0a: VIGENTES sin renovación activa (vence > 60 días) ──────────
+  var bdVigOrden = bdVigentes.slice().sort(function(a,b){ return new Date(a.fv)-new Date(b.fv); });
+  vigData.push(['VIGENTES SIN RENOVACIÓN ACTIVA ('+bdVigentes.length+') — vencen en más de 60 días','','','','','','','','']);
+  vigData.push(bdHeaders);
+  bdVigOrden.forEach(function(r){
+    var d = Math.round((new Date(r.fv)-bdHoy)/86400000);
+    vigData.push([r.ref||'', r.ar||'', r.e||'', r.tb||'', r.ib||'', r.a||'', r.cm||'', r.fv||'', d+' días']);
+  });
+  if (!bdVigentes.length) vigData.push(['Sin registros','','','','','','','','']);
+  vigData.push([]);
+
+  // ── Sección 0b: POR RENOVAR sin proceso activo (vence ≤ 60 días) ─────────
+  var bdPorOrden = bdPorRenov.slice().sort(function(a,b){ return new Date(a.fv)-new Date(b.fv); });
+  vigData.push(['POR RENOVAR SIN PROCESO ACTIVO ('+bdPorRenov.length+') — vencen en 0-60 días','','','','','','','','']);
+  vigData.push(bdHeaders);
+  bdPorOrden.forEach(function(r){
+    var d = Math.round((new Date(r.fv)-bdHoy)/86400000);
+    vigData.push([r.ref||'', r.ar||'', r.e||'', r.tb||'', r.ib||'', r.a||'', r.cm||'', r.fv||'', d===0?'HOY':d+' días']);
+  });
+  if (!bdPorRenov.length) vigData.push(['Sin registros','','','','','','','','']);
+  vigData.push([]);
+
+  // ── Sección 0c: VENCIDOS sin proceso activo ───────────────────────────────
+  var bdVencOrden = bdVencidos2.slice().sort(function(a,b){ return new Date(b.fv)-new Date(a.fv); });
+  vigData.push(['VENCIDOS SIN PROCESO ACTIVO ('+bdVencidos2.length+')','','','','','','','','']);
+  vigData.push(bdHeaders);
+  bdVencOrden.forEach(function(r){
+    var d = Math.round((new Date(r.fv)-bdHoy)/86400000);
+    vigData.push([r.ref||'', r.ar||'', r.e||'', r.tb||'', r.ib||'', r.a||'', r.cm||'', r.fv||'', 'Vencido hace '+Math.abs(d)+' días']);
+  });
+  if (!bdVencidos2.length) vigData.push(['Sin registros','','','','','','','','']);
+  vigData.push([]);
+  vigData.push([]);
+
+  // ── Sección 1+: Contratos EN FLUJO DE RENOVACIÓN (desde renovCache) ───────
+  vigData.push(['CONTRATOS EN PROCESO DE RENOVACIÓN ('+activas.length+')','','','','','','','','','']);
+  vigData.push(vigHeaders);
   function vigRow(r) {
     var lbl  = ETAPAS.find(function(e){ return e.id===r.etapa; });
     var crit = CRITERIO_RENOV[r.etapa] ? CRITERIO_RENOV[r.etapa].label : '';
@@ -2862,7 +2914,7 @@ function exportRenovacionesCSV() {
     sinFechaOrdenados.forEach(function(r){ vigData.push(vigRow(r)); });
   }
   var wsVig = XLSX.utils.aoa_to_sheet(vigData);
-  wsVig['!cols'] = [{wch:30},{wch:32},{wch:20},{wch:36},{wch:18},{wch:14},{wch:16},{wch:30},{wch:16},{wch:16}];
+  wsVig['!cols'] = [{wch:8},{wch:30},{wch:22},{wch:12},{wch:12},{wch:10},{wch:14},{wch:14},{wch:14}];
   XLSX.utils.book_append_sheet(wb, wsVig, 'Vigentes');
 
   // ── Hoja 5: ALERTAS ───────────────────────────────────────────────
