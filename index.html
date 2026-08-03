@@ -2723,9 +2723,15 @@ function exportRenovacionesCSV() {
       var el = ETAPAS.find(function(e){ return e.id===h.etapa; });
       return h.fecha+' - '+(el?el.label:h.etapa)+(h.accion==='retroceso'?' (retroceso)':'');
     }).join(' | ');
+    var detDias = '';
+    if (r.vence) {
+      var dn = Math.round((new Date(r.vence)-new Date())/86400000);
+      detDias = dn < 0 ? 'VENCIDO' : dn === 0 ? 'HOY' : dn + ' días';
+    }
     detData.push([
       r.arren||'', r.bien||'', crit, lbl,
       r.estado==='no_renueva'?'No renueva':'Activa',
+      r.vence||'', detDias,
       r.nota||'', r.fecha_inicio_nuevo||'', r.fecha_fin_nuevo||'',
       r.nota_contrato||'', r.nota_contrato_por||'', r.nota_contrato_fecha||'',
       hist
@@ -2742,7 +2748,8 @@ function exportRenovacionesCSV() {
   var wsDet = XLSX.utils.aoa_to_sheet(detData);
   wsDet['!cols'] = [
     {wch:28},{wch:30},{wch:20},{wch:36},
-    {wch:12},{wch:30},{wch:18},{wch:18},{wch:30},{wch:18},{wch:14},{wch:55}
+    {wch:12},{wch:18},{wch:13},
+    {wch:30},{wch:18},{wch:18},{wch:30},{wch:18},{wch:14},{wch:55}
   ];
   XLSX.utils.book_append_sheet(wb, wsDet, 'Detalle');
 
@@ -2792,21 +2799,32 @@ function exportRenovacionesCSV() {
     [],
     vigHeaders,
   ];
-  vigOrdenado.forEach(function(r) {
-    var lbl  = ETAPAS.find(function(e){ return e.id===r.etapa; });
-    var crit = CRITERIO_RENOV[r.etapa] ? CRITERIO_RENOV[r.etapa].label : '';
-    var dias = '';
-    if (r.vence) {
-      var diasNum = Math.round((new Date(r.vence) - new Date()) / 86400000);
-      dias = diasNum < 0 ? 'VENCIDO' : diasNum === 0 ? 'HOY' : diasNum + ' días';
-    }
-    vigData.push([
-      r.arren||'', r.bien||'', crit,
-      lbl ? lbl.label : r.etapa,
-      r.vence||'', dias,
-      r.resp||'', r.nota||'',
-      r.fecha_inicio_nuevo||'', r.fecha_fin_nuevo||''
-    ]);
+  var vigCriterios = [
+    { label:'Renovado', ids:['notariado'] },
+    { label:'Contrato listo', ids:['firma_ds','firma_arren','firma_jbg','pend_notarizar'] },
+    { label:'En proceso', ids:['docusign','cumplimiento','documentacion','gerencia','condiciones','elaboracion'] },
+  ];
+  vigCriterios.forEach(function(grupo) {
+    var registros = vigOrdenado.filter(function(r){ return grupo.ids.indexOf(r.etapa) > -1; });
+    if (!registros.length) return;
+    vigData.push([grupo.label + ' — ' + registros.length + ' contrato(s)','','','','','','','','','']);
+    registros.forEach(function(r) {
+      var lbl  = ETAPAS.find(function(e){ return e.id===r.etapa; });
+      var crit = CRITERIO_RENOV[r.etapa] ? CRITERIO_RENOV[r.etapa].label : '';
+      var dias = '';
+      if (r.vence) {
+        var diasNum = Math.round((new Date(r.vence) - new Date()) / 86400000);
+        dias = diasNum < 0 ? 'VENCIDO' : diasNum === 0 ? 'HOY' : diasNum + ' días';
+      }
+      vigData.push([
+        r.arren||'', r.bien||'', crit,
+        lbl ? lbl.label : r.etapa,
+        r.vence||'', dias,
+        r.resp||'', r.nota||'',
+        r.fecha_inicio_nuevo||'', r.fecha_fin_nuevo||''
+      ]);
+    });
+    vigData.push([]);
   });
   var wsVig = XLSX.utils.aoa_to_sheet(vigData);
   wsVig['!cols'] = [{wch:30},{wch:32},{wch:20},{wch:36},{wch:18},{wch:14},{wch:16},{wch:30},{wch:16},{wch:16}];
