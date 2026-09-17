@@ -2645,6 +2645,11 @@ function hideAddRenovacion() {
   document.getElementById('add-renov-panel').style.display = 'none';
 }
 
+function editarYVincular(r) {
+  openEditRenov(r);
+  setTimeout(() => abrirLocalesManual(), 0);
+}
+
 async function saveRenovacion(editId) {
   const arren = document.getElementById('rn-arren').value.trim();
   const bien  = document.getElementById('rn-bien').value.trim();
@@ -3338,6 +3343,7 @@ function renderRenovaciones() {
         ${etapaIdx>0?`<button onclick="retrocederEtapa('${r.id}','${r.etapa}')" style="background:none;border:1px solid var(--border);color:var(--muted);padding:4px 10px;border-radius:6px;font-size:11px;cursor:pointer">← Retroceder</button>`:''}
         <div style="display:flex;gap:4px">
           <button onclick="openEditRenov(${JSON.stringify(r).replace(/"/g,'&quot;')})" style="background:none;border:1px solid var(--border);color:var(--muted);padding:4px 8px;border-radius:6px;font-size:11px;cursor:pointer">✏</button>
+          <button onclick="editarYVincular(${JSON.stringify(r).replace(/"/g,'&quot;')})" style="background:none;border:1px solid var(--accent);color:var(--accent);padding:4px 8px;border-radius:6px;font-size:11px;cursor:pointer" title="Vincular locales">🔗 Locales${r.refs&&r.refs.length?` (${r.refs.length})`:''}</button>
           ${r.estado==='no_renueva'
             ? `<button onclick="marcarNoRenueva('${r.id}', false)" style="background:var(--orange)20;border:1px solid var(--orange);color:var(--orange);padding:4px 8px;border-radius:6px;font-size:11px;cursor:pointer" title="Reactivar renovación">↺ Reactivar</button>`
             : `<button onclick="marcarNoRenueva('${r.id}', true)" style="background:none;border:1px solid var(--orange);color:var(--orange);padding:4px 8px;border-radius:6px;font-size:11px;cursor:pointer" title="Marcar como no renueva">🚫 No renueva</button>`
