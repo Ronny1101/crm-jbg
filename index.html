@@ -473,7 +473,7 @@ document.addEventListener('DOMContentLoaded', function() {
         <div class="page-title">Alertas de vencimiento</div>
         <div class="page-sub">Contratos que vencen en los próximos 60 días</div>
       </div>
-      <div class="kpi-grid" id="alerta-kpis" style="grid-template-columns:repeat(4,1fr);margin-bottom:20px;"></div>
+      <div class="kpi-grid" id="alerta-kpis" style="grid-template-columns:repeat(5,1fr);margin-bottom:20px;"></div>
       <div class="table-card">
         <div class="alert-list" id="alert-list" style="padding:8px 0"></div>
       </div>
@@ -667,7 +667,7 @@ document.addEventListener('DOMContentLoaded', function() {
             <datalist id="rn-arren-list"></datalist>
           </div>
           <div>
-            <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:4px">Bien / Estructura</label>
+            <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:4px">Bien / Estructura <a onclick="abrirLocalesManual()" style="color:var(--accent);cursor:pointer;font-weight:600">🔗 vincular locales</a></label>
             <input class="m-input" id="rn-bien" placeholder="Ej: GARZOCENTRO - Local 202" style="width:100%">
           </div>
           <div>
@@ -688,8 +688,9 @@ document.addEventListener('DOMContentLoaded', function() {
           </div>
         </div>
         <div id="rn-locales-panel" style="display:none;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:12px">
-          <div style="font-size:11px;color:var(--muted);font-weight:600;margin-bottom:8px">Este arrendatario tiene varios locales. Selecciona cuáles renuevan en esta gestión:</div>
-          <div id="rn-locales-list" style="display:flex;flex-direction:column;gap:6px"></div>
+          <div style="font-size:11px;color:var(--muted);font-weight:600;margin-bottom:8px">Selecciona qué locales cubre esta renovación (el nombre no tiene que coincidir exacto, busca por arrendatario, edificio o número):</div>
+          <input class="m-input" id="rn-locales-search" placeholder="Buscar local..." oninput="filtrarLocalesPicker()" style="width:100%;margin-bottom:8px">
+          <div id="rn-locales-list" style="display:flex;flex-direction:column;gap:6px;max-height:220px;overflow-y:auto"></div>
         </div>
         <div style="display:flex;gap:8px">
           <button class="btn-save" onclick="saveRenovacion()">Guardar</button>
@@ -1618,24 +1619,34 @@ function renderAlertas() {
   var conFecha  = data.filter(function(r){ return r.fv; });
 
   // Solo los que tienen renovación activa (excluir no_renueva)
-  var renovActivos = (renovCache||[]).filter(function(rv){ return rv.estado !== 'no_renueva'; });
-  // refs explícitos (locales elegidos al crear la renovación)
-  var refsActivos = new Set();
-  renovActivos.forEach(function(rv){ (rv.refs||[]).forEach(function(ref){ refsActivos.add(ref); }); });
-  // fallback por nombre (normalizado, sin tildes) para renovaciones antiguas sin refs
-  var nombresActivosSinRefs = new Set(
-    renovActivos.filter(function(rv){ return !(rv.refs && rv.refs.length); })
-      .map(function(rv){ return normUp(rv.arren); })
-  );
+  var renovActivos   = (renovCache||[]).filter(function(rv){ return rv.estado !== 'no_renueva'; });
+  var renovNoRenueva = (renovCache||[]).filter(function(rv){ return rv.estado === 'no_renueva'; });
 
-  function estaEnRenovacion(r) {
-    if (refsActivos.has(r.ref)) return true;
-    if (r.ar && nombresActivosSinRefs.has(normUp(r.ar))) return true;
+  function refsYNombres(lista) {
+    var refs = new Set();
+    lista.forEach(function(rv){ (rv.refs||[]).forEach(function(ref){ refs.add(ref); }); });
+    var nombres = new Set(
+      lista.filter(function(rv){ return !(rv.refs && rv.refs.length); })
+        .map(function(rv){ return normUp(rv.arren); })
+    );
+    return { refs: refs, nombres: nombres };
+  }
+
+  var activosIdx   = refsYNombres(renovActivos);
+  var noRenuevaIdx = refsYNombres(renovNoRenueva);
+
+  function coincide(r, idx) {
+    if (idx.refs.has(r.ref)) return true;
+    if (r.ar && idx.nombres.has(normUp(r.ar))) return true;
     return false;
   }
 
-  var enRenovacion = conFecha.filter(estaEnRenovacion);
-  var sinRenov = conFecha.filter(function(r){ return !estaEnRenovacion(r); });
+  var enRenovacion = conFecha.filter(function(r){ return coincide(r, activosIdx); });
+  // "No renuevan": se excluyen de vencidos/próximos/vigentes y de sus contadores
+  var gNoRenuevan  = conFecha.filter(function(r){ return coincide(r, noRenuevaIdx) && !coincide(r, activosIdx); });
+  var sinRenov = conFecha.filter(function(r){
+    return !coincide(r, activosIdx) && !coincide(r, noRenuevaIdx);
+  });
 
   var gVencidos = sinRenov.filter(function(r){ return (new Date(r.fv)-hoy)/86400000 < 0; });
   var gProximos = sinRenov.filter(function(r){ var d=(new Date(r.fv)-hoy)/86400000; return d>=0 && d<=60; });
@@ -1657,9 +1668,10 @@ function renderAlertas() {
     kpiCard('proximos',   'var(--orange)', 'Por Renovar',      gProximos.length,    'vencen en \u2264 60 d\u00edas') +
     kpiCard('vencidos',   'var(--red)',    'Vencidos activos',  gVencidos.length,    '') +
     kpiCard('vigentes',   'var(--green)',  'Vigentes',          gVigentes.length,    'vencen en > 60 d\u00edas') +
-    kpiCard('renovando',  'var(--accent)', 'En Renovaci\u00f3n', enRenovacion.length, 'gestionados en flujo');
+    kpiCard('renovando',  'var(--accent)', 'En Renovaci\u00f3n', enRenovacion.length, 'gestionados en flujo') +
+    kpiCard('norenuevan', 'var(--muted)',  'No renuevan',       gNoRenuevan.length,  'contratos que no contin\u00faan');
 
-  renderAlertaLista(gVencidos, gProximos, gVigentes, enRenovacion, hoy);
+  renderAlertaLista(gVencidos, gProximos, gVigentes, enRenovacion, gNoRenuevan, hoy);
 }
 
 function setAlertaFiltro(f) {
@@ -1688,7 +1700,7 @@ function irARenovacion(renovId) {
   }, 300);
 }
 
-function renderAlertaLista(gVencidos, gProximos, gVigentes, enRenovacion, hoy) {
+function renderAlertaLista(gVencidos, gProximos, gVigentes, enRenovacion, gNoRenuevan, hoy) {
   var list = document.getElementById('alert-list');
 
   var arr, col0, tit;
@@ -1698,6 +1710,8 @@ function renderAlertaLista(gVencidos, gProximos, gVigentes, enRenovacion, hoy) {
     arr = gVigentes; col0 = 'var(--green)'; tit = 'Vigentes';
   } else if (_alertaFiltro === 'renovando') {
     arr = enRenovacion; col0 = 'var(--accent)'; tit = 'En renovaci\u00f3n';
+  } else if (_alertaFiltro === 'norenuevan') {
+    arr = gNoRenuevan; col0 = 'var(--muted)'; tit = 'No renuevan';
   } else {
     arr = gProximos; col0 = 'var(--orange)'; tit = 'Por renovar \u2014 vencen en \u2264 60 d\u00edas';
   }
@@ -2528,23 +2542,62 @@ function unidadesDe(nombre) {
   return getData().filter(r => r.ar && normUp(r.ar) === n);
 }
 
+function pintarLocalesList(units) {
+  const list = document.getElementById('rn-locales-list');
+  if (!units.length) { list.innerHTML = '<div style="font-size:11px;color:var(--muted)">Sin resultados.</div>'; return; }
+  list.innerHTML = units.map(u => `
+    <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer">
+      <input type="checkbox" value="${u.ref}" ${_renovRefsSel.includes(u.ref)?'checked':''} onchange="toggleRenovRef(${u.ref}, this.checked)">
+      <span>${esc(u.ar||'')} · ${esc(u.e)} - ${esc(u.tb||'')} ${esc(u.ib||'')} ${u.fv?`<span style="color:var(--muted)">(vence ${esc(u.fv)})</span>`:''}</span>
+    </label>`).join('');
+}
+
+function unidadesConRefsSeleccionados() {
+  return getData().filter(r => _renovRefsSel.includes(r.ref));
+}
+
 function renderLocalesPicker(units, preselected) {
   const panel = document.getElementById('rn-locales-panel');
-  const list  = document.getElementById('rn-locales-list');
-  if (units.length <= 1) {
+  const pre = preselected && preselected.length ? preselected : units.map(u => u.ref);
+  _renovRefsSel = pre.slice();
+  if (units.length <= 1 && !(preselected && preselected.length)) {
     panel.style.display = 'none';
-    list.innerHTML = '';
-    _renovRefsSel = units.map(u => u.ref);
+    document.getElementById('rn-locales-list').innerHTML = '';
+    document.getElementById('rn-locales-search').value = '';
     return;
   }
   panel.style.display = 'block';
-  const pre = preselected && preselected.length ? preselected : units.map(u => u.ref);
-  _renovRefsSel = units.filter(u => pre.includes(u.ref)).map(u => u.ref);
-  list.innerHTML = units.map(u => `
-    <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer">
-      <input type="checkbox" value="${u.ref}" ${pre.includes(u.ref)?'checked':''} onchange="toggleRenovRef(${u.ref}, this.checked)">
-      ${esc(u.e)} - ${esc(u.tb||'')} ${esc(u.ib||'')} ${u.fv?`<span style="color:var(--muted)">(vence ${esc(u.fv)})</span>`:''}
-    </label>`).join('');
+  document.getElementById('rn-locales-search').value = '';
+  pintarLocalesList(units.length ? units : unidadesConRefsSeleccionados());
+}
+
+function abrirLocalesManual() {
+  document.getElementById('rn-locales-panel').style.display = 'block';
+  const arren = document.getElementById('rn-arren').value;
+  const auto = unidadesDe(arren);
+  const seleccionadas = unidadesConRefsSeleccionados();
+  const map = {};
+  auto.concat(seleccionadas).forEach(u => { map[u.ref] = u; });
+  document.getElementById('rn-locales-search').value = '';
+  pintarLocalesList(Object.values(map));
+  document.getElementById('rn-locales-panel').scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+
+function filtrarLocalesPicker() {
+  const q = normUp(document.getElementById('rn-locales-search').value);
+  if (!q) {
+    const arren = document.getElementById('rn-arren').value;
+    const auto = unidadesDe(arren);
+    const seleccionadas = unidadesConRefsSeleccionados();
+    const map = {};
+    auto.concat(seleccionadas).forEach(u => { map[u.ref] = u; });
+    pintarLocalesList(Object.values(map));
+    return;
+  }
+  const resultados = getData().filter(r => r.ar && (
+    normUp(r.ar).includes(q) || normUp(r.e).includes(q) || normUp(r.ib||'').includes(q) || normUp(r.tb||'').includes(q)
+  )).slice(0, 40);
+  pintarLocalesList(resultados);
 }
 
 function toggleRenovRef(ref, checked) {
@@ -2565,6 +2618,7 @@ function showAddRenovacion() {
   _renovRefsSel = [];
   document.getElementById('rn-locales-panel').style.display = 'none';
   document.getElementById('rn-locales-list').innerHTML = '';
+  document.getElementById('rn-locales-search').value = '';
   // Reset save button to create mode
   const btn = document.querySelector('#add-renov-panel .btn-save');
   if (btn) { btn.textContent = 'Guardar'; btn.onclick = ()=>saveRenovacion(null); }
@@ -2606,7 +2660,7 @@ async function saveRenovacion(editId) {
     toast('Error', 'Selecciona al menos un local de este arrendatario.', 'error');
     return;
   }
-  const refs = units.length > 1 ? _renovRefsSel.slice() : units.map(u => u.ref);
+  const refs = _renovRefsSel.length ? _renovRefsSel.slice() : units.map(u => u.ref);
 
   const doc = {
     arren, bien, vence, etapa, resp, nota, refs,
