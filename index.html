@@ -725,7 +725,7 @@ document.addEventListener('DOMContentLoaded', function() {
     <div class="page" id="page-garantias">
       <div class="page-header">
         <div class="page-title">Garantías de arrendatarios</div>
-        <div class="page-sub">Depósitos en garantía registrados · 153 arrendatarios</div>
+        <div class="page-sub" id="gar-page-sub">Depósitos en garantía registrados</div>
       </div>
       <div class="kpi-grid" id="gar-kpis" style="grid-template-columns:repeat(3,1fr);margin-bottom:20px;"></div>
       <div class="table-card">
@@ -950,6 +950,108 @@ const POL_EMPRESAS = new Set(POLIZAS_DATA.map(p => p.empresa.toUpperCase().trim(
 
 // ── GARANTIAS ──
 var garFiltered=[], garPage=1, garSortKey='arrendatario', garSortDir=1;
+var garPerPage = 20;
+var GARANTIAS_LIST = Object.values(GARANTIAS_DATA);
+
+function garUltimo(list) {
+  if (!list || !list.length) return null;
+  return list.slice().sort(function(a,b){ return new Date(b.f) - new Date(a.f); })[0];
+}
+
+function renderGarKPIs() {
+  var total = GARANTIAS_LIST.length;
+  var subEl = document.getElementById('gar-page-sub');
+  if (subEl) subEl.textContent = 'Depósitos en garantía registrados · ' + total + ' arrendatarios';
+  var saldoTotal = GARANTIAS_LIST.reduce(function(s,g){ return s + Math.abs(g.s||0); }, 0);
+  var pendCruce  = GARANTIAS_LIST.filter(function(g){ return g.x; }).length;
+  document.getElementById('gar-kpis').innerHTML =
+    '<div class="kpi-card" style="--card-color:var(--accent)"><div class="kpi-label">Arrendatarios con garantía</div><div class="kpi-val">'+total+'</div></div>' +
+    '<div class="kpi-card" style="--card-color:var(--green)"><div class="kpi-label">Saldo total en garantía</div><div class="kpi-val">$'+Number(saldoTotal).toLocaleString('es-EC',{minimumFractionDigits:2,maximumFractionDigits:2})+'</div></div>' +
+    '<div class="kpi-card" style="--card-color:var(--orange)"><div class="kpi-label">Pendientes de cruce</div><div class="kpi-val">'+pendCruce+'</div></div>';
+}
+
+function filterGar() {
+  var s = (document.getElementById('gar-search')?.value||'').toLowerCase();
+  var fuente = document.getElementById('gar-fuente')?.value||'';
+  garFiltered = GARANTIAS_LIST.filter(function(g) {
+    if (fuente === 'sap'    && !(g.m && g.m.length)) return false;
+    if (fuente === 'cruces' && !(g.i && g.i.length)) return false;
+    if (fuente === 'conta'  && !(g.c && g.c.length)) return false;
+    if (s && !(g.ar||'').toLowerCase().includes(s)) return false;
+    return true;
+  });
+  garFiltered.sort(function(a,b) {
+    var va, vb;
+    if (garSortKey === 'arrendatario') { va = a.ar||''; vb = b.ar||''; }
+    else if (garSortKey === 'valor_sap') { va = a.s||0; vb = b.s||0; }
+    else if (garSortKey === 'fecha_sap') { va = (garUltimo(a.m)||{}).f||''; vb = (garUltimo(b.m)||{}).f||''; }
+    else if (garSortKey === 'valor_cruces') { va = (garUltimo(a.i)||{}).v||0; vb = (garUltimo(b.i)||{}).v||0; }
+    else if (garSortKey === 'fecha_cruces') { va = (garUltimo(a.i)||{}).f||''; vb = (garUltimo(b.i)||{}).f||''; }
+    else if (garSortKey === 'valor_conta') { va = (garUltimo(a.c)||{}).v||0; vb = (garUltimo(b.c)||{}).v||0; }
+    else if (garSortKey === 'fecha_conta') { va = (garUltimo(a.c)||{}).f||''; vb = (garUltimo(b.c)||{}).f||''; }
+    else { va = a.ar||''; vb = b.ar||''; }
+    if (typeof va === 'number') return garSortDir * (va-vb);
+    return garSortDir * String(va).localeCompare(String(vb));
+  });
+  garPage = 1;
+  renderGarTable();
+}
+
+function sortGar(key) {
+  if (garSortKey === key) garSortDir = -garSortDir;
+  else { garSortKey = key; garSortDir = 1; }
+  filterGar();
+}
+
+function renderGarTable() {
+  var tbody = document.getElementById('gar-body');
+  if (!tbody) return;
+  var total = garFiltered.length;
+  var pages = Math.max(1, Math.ceil(total / garPerPage));
+  if (garPage > pages) garPage = pages;
+  var start = (garPage-1) * garPerPage;
+  var slice = garFiltered.slice(start, start + garPerPage);
+  document.getElementById('gar-count').textContent = total + ' arrendatarios';
+  document.getElementById('gar-pag-info').textContent = 'Página '+garPage+' / '+pages;
+  document.getElementById('gar-prev').disabled = garPage <= 1;
+  document.getElementById('gar-next').disabled = garPage >= pages;
+  tbody.innerHTML = slice.map(function(g) {
+    var sap    = garUltimo(g.m);
+    var cruces = garUltimo(g.i);
+    var conta  = garUltimo(g.c);
+    var tienePol = POL_EMPRESAS.has((g.ar||'').toUpperCase().trim());
+    return '<tr>'
+      + '<td style="font-weight:500">'+esc(g.ar||'–')+(g.x?' <span style="color:var(--orange);font-size:10px;font-weight:700" title="'+esc(g.xd||'Pendiente de cruce')+'">⚠ por cruzar</span>':'')+'</td>'
+      + '<td style="text-align:right">$'+Number(g.s||0).toLocaleString('es-EC',{minimumFractionDigits:2,maximumFractionDigits:2})+'</td>'
+      + '<td>'+(sap?sap.f:'–')+'</td>'
+      + '<td style="text-align:right">'+(cruces?'$'+Number(cruces.v||0).toLocaleString('es-EC',{minimumFractionDigits:2,maximumFractionDigits:2}):'–')+'</td>'
+      + '<td>'+(cruces?cruces.f:'–')+'</td>'
+      + '<td style="text-align:right">'+(conta?'$'+Number(conta.v||0).toLocaleString('es-EC',{minimumFractionDigits:2,maximumFractionDigits:2}):'–')+'</td>'
+      + '<td>'+(conta?conta.f:'–')+'</td>'
+      + '<td style="text-align:center">'+(tienePol?'<span class="badge bd-vig">✓ Sí</span>':'<span style="color:var(--muted);font-size:11px">–</span>')+'</td>'
+      + '</tr>';
+  }).join('');
+  if (!slice.length) tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--muted)">Sin resultados.</td></tr>';
+}
+
+function changePagGar(dir) {
+  var pages = Math.max(1, Math.ceil(garFiltered.length / garPerPage));
+  garPage = Math.max(1, Math.min(garPage + dir, pages));
+  renderGarTable();
+}
+
+function exportGarCSV() {
+  if (!garFiltered.length) { toast('Sin datos', 'No hay garantías para exportar.', 'info'); return; }
+  var heads = ['Arrendatario','Valor SAP','Fecha SAP','Valor Cruces','Fecha Cruces','Valor Conta','Fecha Conta','Tiene Póliza'];
+  var rows = garFiltered.map(function(g) {
+    var sap = garUltimo(g.m), cruces = garUltimo(g.i), conta = garUltimo(g.c);
+    var tienePol = POL_EMPRESAS.has((g.ar||'').toUpperCase().trim()) ? 'Sí' : 'No';
+    return [g.ar||'', g.s||0, sap?sap.f:'', cruces?cruces.v:'', cruces?cruces.f:'', conta?conta.v:'', conta?conta.f:'', tienePol]
+      .map(function(v){ return '"'+String(v).replace(/"/g,'""')+'"'; }).join(',');
+  });
+  var blob = new Blob(['﻿'+[heads.join(',')].concat(rows).join('\r\n')], {type:'text/csv;charset=utf-8;'});
+  var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'garantias.csv'; a.click();
+}
 
 
 // ══════════════════════════════════════════════
@@ -1292,6 +1394,28 @@ function fmtPct(n) { return n ? (n*100).toFixed(1)+'%' : '–'; }
 function normUp(s) {
   return (s||'').toString().trim().toUpperCase().normalize('NFD').replace(/\p{Diacritic}/gu, '');
 }
+
+// Índice compartido para saber qué unidades están cubiertas por una renovación
+// (por refs explícitos, con fallback a nombre normalizado para registros antiguos).
+// Se usa tanto en Alertas como en el Dashboard para que ambos cuenten lo mismo.
+function renovIndices(estadoDeseado) {
+  var lista = (renovCache||[]).filter(function(rv){
+    return estadoDeseado === 'no_renueva' ? rv.estado === 'no_renueva' : rv.estado !== 'no_renueva';
+  });
+  var refs = new Set();
+  lista.forEach(function(rv){ (rv.refs||[]).forEach(function(ref){ refs.add(ref); }); });
+  var nombres = new Set(
+    lista.filter(function(rv){ return !(rv.refs && rv.refs.length); })
+      .map(function(rv){ return normUp(rv.arren); })
+  );
+  return { refs: refs, nombres: nombres };
+}
+
+function coincideRenov(r, idx) {
+  if (idx.refs.has(r.ref)) return true;
+  if (r.ar && idx.nombres.has(normUp(r.ar))) return true;
+  return false;
+}
 function bdg(d) {
   const m = {'ALQUILADO':'bd-alq','LIBRE':'bd-lib','LIBRE NO LISTO':'bd-lno','JBG':'bd-jbg'};
   return `<span class="badge ${m[d]||'bd-oth'}">${d}</span>`;
@@ -1345,8 +1469,13 @@ function renderDashboard() {
   const libre = data.filter(r => r.d==='LIBRE');
   const canon = alq.reduce((s,r) => s+(r.cm||0), 0);
   const today = new Date(); today.setHours(0,0,0,0);
+  // Mismo criterio que la página Alertas: excluye contratos ya en renovación activa
+  // o marcados "no renueva", para que ambos contadores digan lo mismo.
+  const dashActivosIdx   = renovIndices('activas');
+  const dashNoRenuevaIdx = renovIndices('no_renueva');
   const alertCnt = data.filter(r => {
     if (!r.fv) return false;
+    if (coincideRenov(r, dashActivosIdx) || coincideRenov(r, dashNoRenuevaIdx)) return false;
     const diff = (new Date(r.fv) - today) / 86400000;
     return diff >= 0 && diff <= 60;
   }).length;
@@ -1618,34 +1747,14 @@ function renderAlertas() {
 
   var conFecha  = data.filter(function(r){ return r.fv; });
 
-  // Solo los que tienen renovación activa (excluir no_renueva)
-  var renovActivos   = (renovCache||[]).filter(function(rv){ return rv.estado !== 'no_renueva'; });
-  var renovNoRenueva = (renovCache||[]).filter(function(rv){ return rv.estado === 'no_renueva'; });
+  var activosIdx   = renovIndices('activas');
+  var noRenuevaIdx = renovIndices('no_renueva');
 
-  function refsYNombres(lista) {
-    var refs = new Set();
-    lista.forEach(function(rv){ (rv.refs||[]).forEach(function(ref){ refs.add(ref); }); });
-    var nombres = new Set(
-      lista.filter(function(rv){ return !(rv.refs && rv.refs.length); })
-        .map(function(rv){ return normUp(rv.arren); })
-    );
-    return { refs: refs, nombres: nombres };
-  }
-
-  var activosIdx   = refsYNombres(renovActivos);
-  var noRenuevaIdx = refsYNombres(renovNoRenueva);
-
-  function coincide(r, idx) {
-    if (idx.refs.has(r.ref)) return true;
-    if (r.ar && idx.nombres.has(normUp(r.ar))) return true;
-    return false;
-  }
-
-  var enRenovacion = conFecha.filter(function(r){ return coincide(r, activosIdx); });
+  var enRenovacion = conFecha.filter(function(r){ return coincideRenov(r, activosIdx); });
   // "No renuevan": se excluyen de vencidos/próximos/vigentes y de sus contadores
-  var gNoRenuevan  = conFecha.filter(function(r){ return coincide(r, noRenuevaIdx) && !coincide(r, activosIdx); });
+  var gNoRenuevan  = conFecha.filter(function(r){ return coincideRenov(r, noRenuevaIdx) && !coincideRenov(r, activosIdx); });
   var sinRenov = conFecha.filter(function(r){
-    return !coincide(r, activosIdx) && !coincide(r, noRenuevaIdx);
+    return !coincideRenov(r, activosIdx) && !coincideRenov(r, noRenuevaIdx);
   });
 
   var gVencidos = sinRenov.filter(function(r){ return (new Date(r.fv)-hoy)/86400000 < 0; });
@@ -1806,11 +1915,16 @@ function openModal(ref) {
   const data = getData(), r = data.find(x => x.ref == ref);
   if (!r) return;
 
-  const arName      = (r.ar || '').toUpperCase().trim();
-  const contactKey  = arName ? arName.replace(/[^A-Z0-9]/g,'_').slice(0,60) : null;
-  const contactData = contactKey ? { ...(CLIENTS_DATA[contactKey]||{}), ...(contactsCache[contactKey]||{}) } : {};
+  const arName        = (r.ar || '').toUpperCase().trim();
+  // Igual que en Renovaciones: quitamos tildes antes de generar la clave, porque los
+  // datasets estáticos (CLIENTS_DATA/GARANTIAS_DATA) fueron generados sin tildes
+  // (ej. "CEDEÑO" -> "CEDENO"), y si no se normaliza aquí el contacto/garantía no aparece.
+  const contactKey       = arName ? normUp(arName).replace(/[^A-Z0-9]/g,'_').slice(0,60) : null;
+  const contactKeyLegacy = arName ? arName.replace(/[^A-Z0-9]/g,'_').slice(0,60) : null;
+  const contactOverride = contactKey ? (contactsCache[contactKey] || contactsCache[contactKeyLegacy] || {}) : {};
+  const contactData = contactKey ? { ...(CLIENTS_DATA[contactKey]||{}), ...contactOverride } : {};
   const garantia    = contactKey ? GARANTIAS_DATA[contactKey] : null;
-  const polsArren   = arName ? POLIZAS_DATA.filter(p => p.empresa.toUpperCase().trim() === arName).sort((a,b)=>new Date(b.fecha_emision||0)-new Date(a.fecha_emision||0)) : [];
+  const polsArren   = arName ? POLIZAS_DATA.filter(p => normUp(p.empresa) === normUp(arName)).sort((a,b)=>new Date(b.fecha_emision||0)-new Date(a.fecha_emision||0)) : [];
   const histRelated = activityCache.filter(a => a.ref == ref);
   const initials    = r.ar ? r.ar.trim().split(' ').slice(0,2).map(w=>w[0]).join('').toUpperCase() : '–';
   const garBadge    = garantia ? ` <span style="background:var(--accent);color:#0f0f13;font-size:9px;padding:1px 5px;border-radius:8px;font-weight:700">1</span>` : '';
@@ -2666,6 +2780,10 @@ async function saveRenovacion(editId) {
     return;
   }
   const refs = _renovRefsSel.length ? _renovRefsSel.slice() : units.map(u => u.ref);
+  if (!refs.length) {
+    toast('Error', 'Ese arrendatario no coincide con ningún local registrado. Usa "🔗 vincular locales" para buscarlo y enlazarlo antes de guardar (así aparece correctamente en Alertas).', 'error');
+    return;
+  }
 
   const doc = {
     arren, bien, vence, etapa, resp, nota, refs,
@@ -2807,13 +2925,8 @@ function exportRenovacionesCSV() {
   // Contratos del portafolio BASE_DATA
   var bdData = (typeof getData === 'function') ? getData() : [];
   var bdHoy  = new Date(); bdHoy.setHours(0,0,0,0);
-  var renovRefsSet = new Set();
-  activas.forEach(function(rv){ (rv.refs||[]).forEach(function(ref){ renovRefsSet.add(ref); }); });
-  var renovNombresSet = new Set(
-    activas.filter(function(rv){ return !(rv.refs && rv.refs.length); })
-      .map(function(rv){ return normUp(rv.arren); })
-  );
-  function enRenovBd(r) { return renovRefsSet.has(r.ref) || (r.ar && renovNombresSet.has(normUp(r.ar))); }
+  var activasIdxCsv = renovIndices('activas');
+  function enRenovBd(r) { return coincideRenov(r, activasIdxCsv); }
   var bdConFecha  = bdData.filter(function(r){ return r.fv && r.d === 'ALQUILADO'; });
   var bdVigentes  = bdConFecha.filter(function(r){ return (new Date(r.fv)-bdHoy)/86400000 > 60 && !enRenovBd(r); });
   var bdPorRenov  = bdConFecha.filter(function(r){ var d=(new Date(r.fv)-bdHoy)/86400000; return d>=0&&d<=60 && !enRenovBd(r); });
