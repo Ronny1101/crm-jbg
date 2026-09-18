@@ -1672,7 +1672,7 @@ function renderDashboard() {
   const dashActivosIdx   = renovIndices('activas');
   const dashNoRenuevaIdx = renovIndices('no_renueva');
   const alertCnt = data.filter(r => {
-    if (!r.fv) return false;
+    if (!r.fv || r.d !== 'ALQUILADO') return false;
     if (coincideRenov(r, dashActivosIdx) || coincideRenov(r, dashNoRenuevaIdx)) return false;
     const diff = (new Date(r.fv) - today) / 86400000;
     return diff >= 0 && diff <= 60;
@@ -1943,7 +1943,9 @@ function renderAlertas() {
   var data = getData();
   var hoy  = new Date(); hoy.setHours(0,0,0,0);
 
-  var conFecha  = data.filter(function(r){ return r.fv; });
+  // Solo unidades realmente alquiladas: un local LIBRE con una fecha vieja de un
+  // contrato anterior no es un "vencido" real — no hay arrendatario que renueve.
+  var conFecha  = data.filter(function(r){ return r.fv && r.d === 'ALQUILADO'; });
 
   var activosIdx   = renovIndices('activas');
   var noRenuevaIdx = renovIndices('no_renueva');
