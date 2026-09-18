@@ -361,6 +361,10 @@ document.addEventListener('DOMContentLoaded', function() {
         <span>Alertas</span>
         <span class="nav-badge" id="alert-badge" style="display:none">0</span>
       </div>
+      <div class="nav-item" id="n-vencimientos" onclick="showPage('vencimientos')" title="Vencimientos consolidados">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/></svg>
+        <span>Vencimientos</span>
+      </div>
       <div class="nav-item" id="n-contratos" onclick="showPage('contratos')" title="Contratos activos">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
         <span>Contratos</span>
@@ -479,6 +483,44 @@ document.addEventListener('DOMContentLoaded', function() {
       </div>
     </div>
 
+    <!-- VENCIMIENTOS CONSOLIDADOS -->
+    <div class="page" id="page-vencimientos">
+      <div class="page-header">
+        <div class="page-title">Vencimientos consolidados</div>
+        <div class="page-sub">Contrato + renovación + pólizas + garantía, por arrendatario</div>
+      </div>
+      <div class="kpi-grid" id="venc-kpis" style="grid-template-columns:repeat(4,1fr);margin-bottom:20px;"></div>
+      <div class="table-card">
+        <div class="toolbar">
+          <div class="search-box">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input id="venc-search" placeholder="Buscar arrendatario…" oninput="renderVencimientos()">
+          </div>
+          <select class="flt" id="venc-filter" onchange="renderVencimientos()">
+            <option value="">Todos los vencimientos</option>
+            <option value="0">Vencidos</option>
+            <option value="30">Vence en ≤ 30 días</option>
+            <option value="60">Vence en ≤ 60 días</option>
+            <option value="90">Vence en ≤ 90 días</option>
+          </select>
+          <span class="tcount" id="venc-count">–</span>
+          <div style="margin-left:auto;display:flex;gap:6px">
+            <button id="venc-view-tabla" onclick="setVencView('tabla')" style="background:var(--accent);color:#0f0f13;border:none;padding:5px 12px;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer">📋 Tabla</button>
+            <button id="venc-view-timeline" onclick="setVencView('timeline')" style="background:none;border:1px solid var(--border);color:var(--muted);padding:5px 12px;border-radius:6px;font-size:12px;cursor:pointer">📅 Timeline</button>
+          </div>
+        </div>
+        <div id="venc-tabla-wrap" class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>Arrendatario</th><th>Locales</th><th>Vence contrato</th><th>Renovación</th><th>Pólizas</th><th>Garantía</th>
+            </tr></thead>
+            <tbody id="venc-body"></tbody>
+          </table>
+        </div>
+        <div id="venc-timeline-wrap" style="display:none;padding:16px"></div>
+      </div>
+    </div>
+
     <!-- CONTRATOS -->
     <div class="page" id="page-contratos">
       <div class="page-header">
@@ -520,6 +562,19 @@ document.addEventListener('DOMContentLoaded', function() {
       <div class="page-header">
         <div class="page-title">Actividad del equipo <span class="nav-pulse" style="display:inline-block;vertical-align:middle;"></span></div>
         <div class="page-sub">Todos los cambios en tiempo real — se actualiza automáticamente</div>
+      </div>
+      <div class="toolbar" style="margin-bottom:10px">
+        <div class="search-box">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input id="feed-search" placeholder="Buscar por texto o usuario…" oninput="renderFeed()">
+        </div>
+        <select class="flt" id="feed-tipo" onchange="renderFeed()">
+          <option value="">Todos los tipos</option>
+          <option value="renovacion">Renovaciones</option>
+          <option value="alquiler">Alquileres</option>
+          <option value="update">Cambios de contrato</option>
+        </select>
+        <span class="tcount" id="feed-count">–</span>
       </div>
       <div class="feed-list" id="feed-list"></div>
     </div>
@@ -711,6 +766,7 @@ document.addEventListener('DOMContentLoaded', function() {
           </select>
           <span class="tcount" id="rn-count">–</span>
           <button id="rn-toggle-norenueva" onclick="toggleNoRenueva()" style="background:none;border:1px solid var(--border);color:var(--muted);padding:5px 12px;border-radius:6px;font-size:12px;cursor:pointer">👁 Ver no renuevan</button>
+          <button id="rn-generar-borradores" onclick="generarBorradoresRenovacion()" style="display:none;background:none;border:1px solid var(--accent);color:var(--accent);padding:5px 12px;border-radius:6px;font-size:12px;cursor:pointer">🔄 Generar borradores</button>
           <button class="btn-export" onclick="exportRenovacionesCSV()">↓ Excel/CSV</button>
         </div>
 
@@ -1051,6 +1107,147 @@ function exportGarCSV() {
   });
   var blob = new Blob(['﻿'+[heads.join(',')].concat(rows).join('\r\n')], {type:'text/csv;charset=utf-8;'});
   var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'garantias.csv'; a.click();
+}
+
+// ══════════════════════════════════════════════
+// VENCIMIENTOS CONSOLIDADOS (contrato + renovación + pólizas + garantía)
+// ══════════════════════════════════════════════
+var _vencView = 'tabla';
+var vencGrupos = [];
+
+function garantiaDe(nombre) {
+  var n = normUp(nombre);
+  if (!n) return null;
+  return GARANTIAS_LIST.find(function(g){ return normUp(g.ar) === n; }) || null;
+}
+
+function consolidadoVencimientos() {
+  var data = getData().filter(function(r){ return r.fv && r.d === 'ALQUILADO'; });
+  var activosIdx   = renovIndices('activas');
+  var noRenuevaIdx = renovIndices('no_renueva');
+  var grupos = {};
+  data.forEach(function(r) {
+    var key = normUp(r.ar) || ('SIN_ARRENDATARIO_' + r.ref);
+    if (!grupos[key]) grupos[key] = { arren: r.ar || '(sin arrendatario)', unidades: [] };
+    grupos[key].unidades.push(r);
+  });
+  return Object.values(grupos).map(function(g) {
+    var ordenadas = g.unidades.slice().sort(function(a,b){ return new Date(a.fv)-new Date(b.fv); });
+    var proximo = ordenadas[0];
+    var enRenov  = g.unidades.some(function(u){ return coincideRenov(u, activosIdx); });
+    var noRenov  = g.unidades.some(function(u){ return coincideRenov(u, noRenuevaIdx); });
+    var pols = POLIZAS_DATA.filter(function(p){ return normUp(p.empresa) === normUp(g.arren); });
+    var gar  = garantiaDe(g.arren);
+    return {
+      arren: g.arren, unidades: g.unidades, vence: proximo.fv,
+      enRenov: enRenov, noRenov: noRenov, pols: pols, gar: gar,
+    };
+  }).sort(function(a,b){ return new Date(a.vence) - new Date(b.vence); });
+}
+
+function renovBadgeVenc(g) {
+  if (g.noRenov) return '<span style="background:var(--muted)22;color:var(--muted);border-radius:6px;padding:2px 8px;font-size:11px;font-weight:600">🚫 No renueva</span>';
+  if (g.enRenov) return '<span style="background:var(--accent)22;color:var(--accent);border-radius:6px;padding:2px 8px;font-size:11px;font-weight:600">🔄 En renovación</span>';
+  return '<span style="background:var(--orange)22;color:var(--orange);border-radius:6px;padding:2px 8px;font-size:11px;font-weight:600">⚠ Sin gestionar</span>';
+}
+
+function polBadgeVenc(g) {
+  if (!g.pols.length) return '<span style="color:var(--muted);font-size:11px">Sin póliza</span>';
+  var vig = g.pols.filter(function(p){ return p.estado==='VIGENTE'; }).length;
+  var porVencer = g.pols.filter(function(p){ return p.estado==='POR VENCER'; }).length;
+  var col = vig ? 'var(--green)' : porVencer ? 'var(--orange)' : 'var(--red)';
+  var lbl = vig ? vig+' vigente'+(vig>1?'s':'') : porVencer ? porVencer+' por vencer' : 'vencidas';
+  return '<span style="background:'+col+'22;color:'+col+';border-radius:6px;padding:2px 8px;font-size:11px;font-weight:600">'+lbl+'</span>';
+}
+
+function garBadgeVenc(g) {
+  if (!g.gar) return '<span style="color:var(--muted);font-size:11px">–</span>';
+  if (g.gar.x) return '<span style="background:var(--orange)22;color:var(--orange);border-radius:6px;padding:2px 8px;font-size:11px;font-weight:600">⚠ Por cruzar</span>';
+  return '<span style="background:var(--green)22;color:var(--green);border-radius:6px;padding:2px 8px;font-size:11px;font-weight:600">✓ Registrada</span>';
+}
+
+function setVencView(v) {
+  _vencView = v;
+  var bTabla = document.getElementById('venc-view-tabla'), bLine = document.getElementById('venc-view-timeline');
+  bTabla.style.background = v==='tabla' ? 'var(--accent)' : 'none';
+  bTabla.style.color = v==='tabla' ? '#0f0f13' : 'var(--muted)';
+  bTabla.style.border = v==='tabla' ? 'none' : '1px solid var(--border)';
+  bLine.style.background = v==='timeline' ? 'var(--accent)' : 'none';
+  bLine.style.color = v==='timeline' ? '#0f0f13' : 'var(--muted)';
+  bLine.style.border = v==='timeline' ? 'none' : '1px solid var(--border)';
+  document.getElementById('venc-tabla-wrap').style.display = v==='tabla' ? '' : 'none';
+  document.getElementById('venc-timeline-wrap').style.display = v==='timeline' ? '' : 'none';
+  renderVencimientos();
+}
+
+function renderVencimientos() {
+  var hoy = new Date(); hoy.setHours(0,0,0,0);
+  var s = (document.getElementById('venc-search')?.value||'').toLowerCase();
+  var maxDias = document.getElementById('venc-filter')?.value || '';
+  vencGrupos = consolidadoVencimientos().filter(function(g) {
+    var dias = Math.round((new Date(g.vence)-hoy)/86400000);
+    if (maxDias === '0' && dias >= 0) return false;
+    if (maxDias && maxDias !== '0' && !(dias >= 0 && dias <= Number(maxDias))) return false;
+    if (!maxDias && dias < -365) return false; // por defecto no arrastrar vencidos muy antiguos
+    if (s && !g.arren.toLowerCase().includes(s)) return false;
+    return true;
+  });
+
+  document.getElementById('venc-count').textContent = vencGrupos.length + ' arrendatarios';
+
+  var total = vencGrupos.length;
+  var d30 = vencGrupos.filter(function(g){ return Math.round((new Date(g.vence)-hoy)/86400000) <= 30 && Math.round((new Date(g.vence)-hoy)/86400000) >= 0; }).length;
+  var d60 = vencGrupos.filter(function(g){ var d=Math.round((new Date(g.vence)-hoy)/86400000); return d>=0 && d<=60; }).length;
+  var sinPoliza = vencGrupos.filter(function(g){ var d=Math.round((new Date(g.vence)-hoy)/86400000); return d>=0 && d<=60 && !g.pols.some(function(p){return p.estado==='VIGENTE';}); }).length;
+  var garCruzar = vencGrupos.filter(function(g){ return g.gar && g.gar.x; }).length;
+  document.getElementById('venc-kpis').innerHTML =
+    '<div class="kpi-card" style="--card-color:var(--accent)"><div class="kpi-label">En esta vista</div><div class="kpi-val">'+total+'</div></div>' +
+    '<div class="kpi-card" style="--card-color:var(--red)"><div class="kpi-label">Vencen ≤ 30 días</div><div class="kpi-val">'+d30+'</div></div>' +
+    '<div class="kpi-card" style="--card-color:var(--orange)"><div class="kpi-label">Sin póliza vigente (≤60d)</div><div class="kpi-val">'+sinPoliza+'</div></div>' +
+    '<div class="kpi-card" style="--card-color:var(--accent2)"><div class="kpi-label">Garantía por cruzar</div><div class="kpi-val">'+garCruzar+'</div></div>';
+
+  if (_vencView === 'tabla') {
+    var tbody = document.getElementById('venc-body');
+    if (!vencGrupos.length) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:30px;color:var(--muted)">Sin resultados.</td></tr>'; return; }
+    tbody.innerHTML = vencGrupos.map(function(g) {
+      var dias = Math.round((new Date(g.vence)-hoy)/86400000);
+      var col = dias < 0 ? 'var(--red)' : dias <= 30 ? 'var(--red)' : dias <= 60 ? 'var(--orange)' : 'var(--green)';
+      var lbl = dias < 0 ? 'Vencido hace '+Math.abs(dias)+'d' : dias === 0 ? 'Hoy' : dias+'d';
+      return '<tr>'
+        + '<td style="font-weight:500">'+esc(g.arren)+'</td>'
+        + '<td>'+g.unidades.length+' ('+g.unidades.map(function(u){ return esc(u.ib||'?'); }).join(', ')+')</td>'
+        + '<td>'+g.vence+' <span style="color:'+col+';font-weight:600;font-size:11px">('+lbl+')</span></td>'
+        + '<td>'+renovBadgeVenc(g)+'</td>'
+        + '<td>'+polBadgeVenc(g)+'</td>'
+        + '<td>'+garBadgeVenc(g)+'</td>'
+        + '</tr>';
+    }).join('');
+  } else {
+    var buckets = [
+      { label: 'Vencidos', test: function(d){ return d < 0; }, color: 'var(--red)' },
+      { label: '0 – 15 días', test: function(d){ return d >= 0 && d <= 15; }, color: 'var(--red)' },
+      { label: '16 – 30 días', test: function(d){ return d > 15 && d <= 30; }, color: 'var(--orange)' },
+      { label: '31 – 60 días', test: function(d){ return d > 30 && d <= 60; }, color: 'var(--accent)' },
+      { label: '61 – 90 días', test: function(d){ return d > 60 && d <= 90; }, color: 'var(--green)' },
+      { label: 'Más de 90 días', test: function(d){ return d > 90; }, color: 'var(--muted)' },
+    ];
+    var wrap = document.getElementById('venc-timeline-wrap');
+    wrap.innerHTML = buckets.map(function(b) {
+      var items = vencGrupos.filter(function(g){ return b.test(Math.round((new Date(g.vence)-hoy)/86400000)); });
+      if (!items.length) return '';
+      return '<div style="margin-bottom:18px">'
+        + '<div style="font-size:11px;font-weight:700;color:'+b.color+';text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--border)">'+b.label+' ('+items.length+')</div>'
+        + '<div style="display:flex;flex-direction:column;gap:6px">'
+        + items.map(function(g) {
+            return '<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--surface2);border-radius:8px;border-left:3px solid '+b.color+'">'
+              + '<div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:500">'+esc(g.arren)+'</div>'
+              + '<div style="font-size:11px;color:var(--muted)">'+g.unidades.length+' local(es) · vence '+g.vence+'</div></div>'
+              + renovBadgeVenc(g) + polBadgeVenc(g) + garBadgeVenc(g)
+              + '</div>';
+          }).join('')
+        + '</div></div>';
+    }).join('') || '<div style="text-align:center;padding:30px;color:var(--muted)">Sin resultados.</div>';
+  }
 }
 
 
@@ -1452,6 +1649,7 @@ function showPage(id) {
   document.getElementById('n-'+id).classList.add('active');
   if (id==='actividad') renderFeed();
   if (id==='alertas') renderAlertas();
+  if (id==='vencimientos') renderVencimientos();
   if (id==='garantias') { renderGarKPIs(); filterGar(); }
   if (id==='polizas') { renderPolKPIs(); filterPol(); }
   if (id==='usuarios') { renderUsuariosPage(); }
@@ -1895,8 +2093,17 @@ function renderFeed() {
         </div>`).join('')}
     </div>`;
   }
-  if(!activityCache.length){el.innerHTML=extra+'<div class="feed-empty">Sin actividad aún.</div>';return;}
-  el.innerHTML=extra+activityCache.map(a=>`
+  const fSearch = (document.getElementById('feed-search')?.value||'').toLowerCase();
+  const fTipo   = document.getElementById('feed-tipo')?.value||'';
+  const filtrado = activityCache.filter(a => {
+    if (fTipo && a.type !== fTipo) return false;
+    if (fSearch && !(a.msg||'').toLowerCase().includes(fSearch) && !(a.userName||'').toLowerCase().includes(fSearch)) return false;
+    return true;
+  });
+  const cntEl = document.getElementById('feed-count');
+  if (cntEl) cntEl.textContent = filtrado.length + ' de ' + activityCache.length;
+  if(!filtrado.length){el.innerHTML=extra+'<div class="feed-empty">Sin actividad que coincida.</div>';return;}
+  el.innerHTML=extra+filtrado.map(a=>`
     <div class="feed-item">
       <div class="feed-avatar">${userDisplay(a)}</div>
       <div class="feed-body">
@@ -2764,6 +2971,18 @@ function editarYVincular(r) {
   setTimeout(() => abrirLocalesManual(), 0);
 }
 
+async function logActivity(ref, msg, type) {
+  try {
+    await db.collection('activity').add({
+      ts: Date.now(), ref: ref || 0, msg,
+      userId: currentUser.uid,
+      userName: currentUser.displayName || currentUser.email.split('@')[0],
+      photo: currentUser.photoURL || '',
+      type: type || 'update',
+    });
+  } catch(e) { console.error('logActivity', e); }
+}
+
 async function saveRenovacion(editId) {
   const arren = document.getElementById('rn-arren').value.trim();
   const bien  = document.getElementById('rn-bien').value.trim();
@@ -2801,9 +3020,11 @@ async function saveRenovacion(editId) {
       }
       await db.collection('renovaciones').doc(editId).update({ arren, bien, vence, etapa, resp, nota, refs, historial });
       toast('Renovación actualizada', arren, 'success');
+      logActivity(refs[0], `Renovación actualizada: ${arren} (${bien})`, 'renovacion');
     } else {
       await db.collection('renovaciones').add(doc);
       toast('Renovación creada', arren, 'success');
+      logActivity(refs[0], `Renovación creada: ${arren} (${bien})`, 'renovacion');
     }
     hideAddRenovacion();
     document.getElementById('rn-arren').value = '';
@@ -2828,6 +3049,7 @@ async function avanzarEtapa(id, currentEtapaId) {
       historial,
     });
     toast('Etapa avanzada', nextEtapa.label, 'success');
+    logActivity((existing?.refs||[])[0], `Renovación de "${existing?.arren||'?'}" avanzó a: ${nextEtapa.label}`, 'renovacion');
   } catch(e) { toast('Error', e.message, 'error'); }
 }
 
@@ -2842,15 +3064,18 @@ async function retrocederEtapa(id, currentEtapaId) {
     historial.push({ etapa: prevEtapa.id, fecha: new Date().toISOString().slice(0,10), user: currentUser.email, accion: 'retroceso' });
     await db.collection('renovaciones').doc(id).update({ etapa: prevEtapa.id, historial });
     toast('Etapa retrocedida', prevEtapa.label, 'info');
+    logActivity((existing?.refs||[])[0], `Renovación de "${existing?.arren||'?'}" retrocedió a: ${prevEtapa.label}`, 'renovacion');
   } catch(e) { toast('Error', e.message, 'error'); }
 }
 
 async function deleteRenovacion(id) {
   if (!isAdmin()) return;
   if (!confirm('¿Eliminar esta renovación?')) return;
+  const existing = renovCache.find(r=>r.id===id);
   try {
     await db.collection('renovaciones').doc(id).delete();
     toast('Renovación eliminada', '', 'info');
+    logActivity((existing?.refs||[])[0], `Renovación eliminada: ${existing?.arren||'?'}`, 'renovacion');
   } catch(e) { toast('Error', e.message, 'error'); }
 }
 
@@ -3242,12 +3467,91 @@ function toggleNoRenueva() {
   renderRenovaciones();
 }
 
+function unidadesDeRenovacion(r) {
+  if (r.refs && r.refs.length) return getData().filter(u => r.refs.includes(u.ref));
+  return unidadesDe(r.arren);
+}
+
+// Contratos que vencen en <= 60 días y todavía no tienen ninguna renovación
+// (ni activa ni "no renueva") gestionándolos, agrupados por arrendatario.
+function candidatosBorradorRenovacion() {
+  var data = getData();
+  var hoy = new Date(); hoy.setHours(0,0,0,0);
+  var activosIdx   = renovIndices('activas');
+  var noRenuevaIdx = renovIndices('no_renueva');
+  var sinGestion = data.filter(function(r){
+    if (!r.fv || r.d !== 'ALQUILADO') return false;
+    var d = (new Date(r.fv) - hoy) / 86400000;
+    if (!(d >= 0 && d <= 60)) return false;
+    return !coincideRenov(r, activosIdx) && !coincideRenov(r, noRenuevaIdx);
+  });
+  var grupos = {};
+  sinGestion.forEach(function(r){
+    var key = normUp(r.ar || ('SIN_ARRENDATARIO_' + r.ref));
+    if (!grupos[key]) grupos[key] = [];
+    grupos[key].push(r);
+  });
+  return Object.values(grupos);
+}
+
+async function generarBorradoresRenovacion() {
+  if (!isAdmin()) return;
+  var grupos = candidatosBorradorRenovacion();
+  if (!grupos.length) { toast('Sin pendientes', 'Todos los contratos por vencer ya tienen renovación gestionada.', 'info'); return; }
+  var totalUnidades = grupos.reduce(function(s,g){ return s+g.length; }, 0);
+  var confirmMsg = 'Se crearán ' + grupos.length + ' borrador(es) de renovación (' + totalUnidades + ' unidad(es) en total) para contratos que vencen en los próximos 60 días y no tienen gestión. ¿Continuar?';
+  if (!confirm(confirmMsg)) return;
+  try {
+    var batch = db.batch();
+    grupos.forEach(function(g){
+      var arren = g[0].ar || '';
+      var venceMasCercano = g.slice().sort(function(a,b){ return new Date(a.fv)-new Date(b.fv); })[0].fv;
+      var bien = g.length > 1 ? (g[0].e + ' y ' + (g.length-1) + ' local(es) más') : (g[0].e + ' - ' + (g[0].tb||'') + ' ' + (g[0].ib||''));
+      var docRef = db.collection('renovaciones').doc();
+      batch.set(docRef, {
+        arren: arren, bien: bien, vence: venceMasCercano, etapa: 'docusign',
+        resp: '', nota: 'Borrador generado automáticamente (vencimiento ≤ 60 días).',
+        refs: g.map(function(u){ return u.ref; }),
+        estado: 'activo', ts: Date.now(), creadoPor: currentUser.email, auto: true,
+        historial: [{ etapa: 'docusign', fecha: new Date().toISOString().slice(0,10), user: currentUser.email, accion: 'auto_generado' }],
+      });
+    });
+    await batch.commit();
+    toast('Borradores creados', grupos.length + ' renovación(es) generadas automáticamente', 'success');
+    logActivity(grupos[0][0].ref, `Se generaron ${grupos.length} borrador(es) de renovación automáticamente (vencimiento ≤ 60 días)`, 'renovacion');
+  } catch(e) { toast('Error', e.message, 'error'); }
+}
+
+// Sincroniza "Estado contrato" (pestaña Contratos) a Vencido para las unidades
+// de una renovación marcada "no renueva", sin pisar el resto de campos del override.
+async function sincronizarEstadoVencido(unidades, motivo) {
+  const afectadas = unidades.filter(u => u.es !== 'Vencido');
+  if (!afectadas.length) return;
+  const batch = db.batch();
+  afectadas.forEach(u => {
+    batch.set(db.collection('overrides').doc(String(u.ref)), { es: 'Vencido' }, { merge: true });
+  });
+  await batch.commit();
+  afectadas.forEach(u => {
+    overrides[String(u.ref)] = { ...(overrides[String(u.ref)]||{}), es: 'Vencido' };
+  });
+  await db.collection('activity').add({
+    ts: Date.now(), ref: afectadas[0].ref,
+    msg: `Estado contrato → Vencido automático en ${afectadas.length} unidad${afectadas.length>1?'es':''} (${motivo})`,
+    userId: currentUser.uid,
+    userName: currentUser.displayName || currentUser.email.split('@')[0],
+    photo: currentUser.photoURL || '',
+    type: 'update',
+  });
+}
+
 async function marcarNoRenueva(id, marcar) {
   if (!isAdmin()) return;
   const r = renovCache.find(x => x.id === id);
   if (!r) return;
+  const unidades = unidadesDeRenovacion(r);
   const msg = marcar
-    ? `¿Marcar a "${r.arren}" como NO renueva? Se ocultará del flujo activo.`
+    ? `¿Marcar a "${r.arren}" como NO renueva? Se ocultará del flujo activo${unidades.length?` y su${unidades.length>1?'s':''} ${unidades.length} unidad${unidades.length>1?'es':''} pasará${unidades.length>1?'n':''} a "Vencido" en Contratos`:''}.`
     : `¿Reactivar la renovación de "${r.arren}"?`;
   if (!confirm(msg)) return;
   try {
@@ -3262,7 +3566,11 @@ async function marcarNoRenueva(id, marcar) {
       estado: marcar ? 'no_renueva' : 'activo',
       historial,
     });
+    if (marcar && unidades.length) {
+      await sincronizarEstadoVencido(unidades, `no renueva: ${r.arren}`);
+    }
     toast(marcar ? 'Marcado como no renueva' : 'Renovación reactivada', r.arren, marcar ? 'info' : 'success');
+    logActivity((r.refs||[])[0], marcar ? `Renovación marcada como NO renueva: ${r.arren}` : `Renovación reactivada: ${r.arren}`, 'renovacion');
   } catch(e) { toast('Error', e.message, 'error'); }
 }
 
@@ -3326,6 +3634,13 @@ function renderRenovaciones() {
   renderRenovAlertasPanel();
   const s  = (document.getElementById('rn-search')?.value||'').toLowerCase();
   const fe = document.getElementById('rn-filter-etapa')?.value||'';
+
+  const btnBorradores = document.getElementById('rn-generar-borradores');
+  if (btnBorradores) {
+    const pendientes = isAdmin() ? candidatosBorradorRenovacion().length : 0;
+    btnBorradores.style.display = pendientes ? '' : 'none';
+    btnBorradores.textContent = '🔄 Generar borradores (' + pendientes + ')';
+  }
 
   // ── Chips por responsable ──────────────────────────
   const activos = renovCache.filter(r => r.estado !== 'no_renueva');
