@@ -3093,9 +3093,9 @@ function unidadesDe(nombre) {
   return todasLasUnidades().filter(r => r.ar && normUp(r.ar) === n);
 }
 
-function pintarLocalesList(units) {
+function pintarLocalesList(units, emptyMsg) {
   const list = document.getElementById('rn-locales-list');
-  if (!units.length) { list.innerHTML = '<div style="font-size:11px;color:var(--muted)">Sin resultados.</div>'; return; }
+  if (!units.length) { list.innerHTML = '<div style="font-size:11px;color:var(--muted)">' + (emptyMsg || 'Sin resultados.') + '</div>'; return; }
   list.innerHTML = units.map(u => `
     <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer">
       <input type="checkbox" value="${u.ref}" ${_renovRefsSel.includes(u.ref)?'checked':''} onchange="toggleRenovRef(${u.ref}, this.checked)">
@@ -3130,7 +3130,7 @@ function abrirLocalesManual() {
   const map = {};
   auto.concat(seleccionadas).forEach(u => { map[u.ref] = u; });
   document.getElementById('rn-locales-search').value = '';
-  pintarLocalesList(Object.values(map));
+  pintarLocalesList(Object.values(map), 'Escribe arriba para buscar un local, oficina o terreno (por arrendatario, edificio/complejo o número).');
   document.getElementById('rn-locales-panel').scrollIntoView({behavior:'smooth', block:'nearest'});
 }
 
@@ -3142,13 +3142,13 @@ function filtrarLocalesPicker() {
     const seleccionadas = unidadesConRefsSeleccionados();
     const map = {};
     auto.concat(seleccionadas).forEach(u => { map[u.ref] = u; });
-    pintarLocalesList(Object.values(map));
+    pintarLocalesList(Object.values(map), 'Escribe arriba para buscar un local, oficina o terreno (por arrendatario, edificio/complejo o número).');
     return;
   }
   const resultados = todasLasUnidades().filter(r => (
     normUp(r.ar||'').includes(q) || normUp(r.e||'').includes(q) || normUp(r.ib||'').includes(q) || normUp(r.tb||'').includes(q) || normUp(r.cc||'').includes(q)
   )).slice(0, 40);
-  pintarLocalesList(resultados);
+  pintarLocalesList(resultados, 'Sin resultados para "' + document.getElementById('rn-locales-search').value + '".');
 }
 
 function toggleRenovRef(ref, checked) {
