@@ -832,7 +832,7 @@ document.addEventListener('DOMContentLoaded', function() {
         <div class="page-title">Terrenos comercializables</div>
         <div class="page-sub">Portafolio de terrenos — Actualizado Agosto 2026</div>
       </div>
-      <div class="kpi-grid" id="terr-kpis" style="grid-template-columns:repeat(5,1fr);margin-bottom:20px;"></div>
+      <div class="kpi-grid" id="terr-kpis" style="grid-template-columns:repeat(6,1fr);margin-bottom:20px;"></div>
       <div class="table-card">
         <div class="toolbar">
           <div class="search-box">
@@ -851,6 +851,8 @@ document.addEventListener('DOMContentLoaded', function() {
             <option value="Vigente">Vigente</option>
             <option value="Por Renovar">Por Renovar</option>
             <option value="Vencido">Vencido</option>
+            <option value="En Renovación">En Renovación</option>
+            <option value="No Renueva">No Renueva</option>
           </select>
           <span class="tcount" id="terr-count">–</span>
           <button class="btn-export" onclick="exportTerrenosCSV()">↓ CSV</button>
@@ -1091,6 +1093,14 @@ function terrEstadoCalc(t) {
   return 'Vigente';
 }
 
+// Igual que en Alertas: si el terreno ya tiene una renovación activa o marcada
+// "no renueva", eso manda sobre el estado calculado por fecha.
+function terrEstadoEfectivo(t, activosIdx, noRenuevaIdx) {
+  if (coincideRenov(t, activosIdx)) return 'En Renovación';
+  if (coincideRenov(t, noRenuevaIdx)) return 'No Renueva';
+  return terrEstadoCalc(t);
+}
+
 function terrBadgeDisponibilidad(d) {
   var map = { 'ALQUILADO':'bd-alq', 'LIBRE':'bd-lib', 'VENDIDO':'bd-oth', 'COMODATO':'bd-oth' };
   var cls = map[d] || 'bd-oth';
@@ -1098,33 +1108,40 @@ function terrBadgeDisponibilidad(d) {
 }
 
 function terrBadgeEstado(estado) {
-  var col = estado === 'Vencido' ? 'var(--red)' : estado === 'Por Renovar' ? 'var(--orange)' : estado === 'Vigente' ? 'var(--green)' : 'var(--muted)';
-  var lbl = estado || '–';
+  var col = estado === 'Vencido' ? 'var(--red)' : estado === 'Por Renovar' ? 'var(--orange)' : estado === 'Vigente' ? 'var(--green)'
+    : estado === 'En Renovación' ? 'var(--accent)' : estado === 'No Renueva' ? '#f472b6' : 'var(--muted)';
+  var lbl = estado === 'En Renovación' ? '🔄 En Renovación' : estado === 'No Renueva' ? '🚫 No Renueva' : (estado || '–');
   return '<span style="background:' + col + '22;color:' + col + ';border-radius:6px;padding:2px 8px;font-size:11px;font-weight:600">' + lbl + '</span>';
 }
 
 function renderTerrenosKPIs() {
   var data = getTerrenosData();
+  var activosIdx = renovIndices('activas');
+  var noRenuevaIdx = renovIndices('no_renueva');
   var total = data.length;
   var alquilados = data.filter(function(t){ return t.d === 'ALQUILADO'; });
-  var vencidos = alquilados.filter(function(t){ return terrEstadoCalc(t) === 'Vencido'; });
-  var porRenovar = alquilados.filter(function(t){ return terrEstadoCalc(t) === 'Por Renovar'; });
   var libres = data.filter(function(t){ return t.d === 'LIBRE'; });
+  var vencidos = alquilados.filter(function(t){ return terrEstadoEfectivo(t, activosIdx, noRenuevaIdx) === 'Vencido'; });
+  var porRenovar = alquilados.filter(function(t){ return terrEstadoEfectivo(t, activosIdx, noRenuevaIdx) === 'Por Renovar'; });
+  var enRenovacion = alquilados.filter(function(t){ return coincideRenov(t, activosIdx); });
   document.getElementById('terr-kpis').innerHTML =
     '<div class="kpi-card" style="--card-color:var(--accent)"><div class="kpi-label">Total terrenos</div><div class="kpi-val">'+total+'</div></div>' +
     '<div class="kpi-card" style="--card-color:var(--green)"><div class="kpi-label">Alquilados</div><div class="kpi-val">'+alquilados.length+'</div></div>' +
     '<div class="kpi-card" style="--card-color:var(--accent2)"><div class="kpi-label">Libres</div><div class="kpi-val">'+libres.length+'</div></div>' +
     '<div class="kpi-card" style="--card-color:var(--orange)"><div class="kpi-label">Por renovar (≤60d)</div><div class="kpi-val">'+porRenovar.length+'</div></div>' +
-    '<div class="kpi-card" style="--card-color:var(--red)"><div class="kpi-label">Vencidos</div><div class="kpi-val">'+vencidos.length+'</div></div>';
+    '<div class="kpi-card" style="--card-color:var(--red)"><div class="kpi-label">Vencidos</div><div class="kpi-val">'+vencidos.length+'</div></div>' +
+    '<div class="kpi-card" style="--card-color:var(--accent)"><div class="kpi-label">En Renovación</div><div class="kpi-val">'+enRenovacion.length+'</div></div>';
 }
 
 function filterTerrenos() {
   var s = (document.getElementById('terr-search')?.value||'').toLowerCase();
   var disp = document.getElementById('terr-disp')?.value || '';
   var est = document.getElementById('terr-estado')?.value || '';
+  var activosIdx = renovIndices('activas');
+  var noRenuevaIdx = renovIndices('no_renueva');
   terrFiltered = getTerrenosData().filter(function(t) {
     if (disp && t.d !== disp) return false;
-    if (est && terrEstadoCalc(t) !== est) return false;
+    if (est && terrEstadoEfectivo(t, activosIdx, noRenuevaIdx) !== est) return false;
     if (s) {
       var q = ((t.e||'')+' '+(t.ib||'')+' '+(t.ar||'')+' '+(t.cc||'')).toLowerCase();
       if (!q.includes(s)) return false;
@@ -1133,7 +1150,7 @@ function filterTerrenos() {
   });
   terrFiltered.sort(function(a,b) {
     var va = a[terrSortKey], vb = b[terrSortKey];
-    if (terrSortKey === 'estado') { va = terrEstadoCalc(a); vb = terrEstadoCalc(b); }
+    if (terrSortKey === 'estado') { va = terrEstadoEfectivo(a, activosIdx, noRenuevaIdx); vb = terrEstadoEfectivo(b, activosIdx, noRenuevaIdx); }
     va = va || (typeof a[terrSortKey] === 'number' ? 0 : '');
     vb = vb || (typeof b[terrSortKey] === 'number' ? 0 : '');
     if (typeof va === 'number') return terrSortDir * (va - vb);
@@ -1152,6 +1169,8 @@ function sortTerrenos(key) {
 function renderTerrenosTable() {
   var tbody = document.getElementById('terr-body');
   if (!tbody) return;
+  var activosIdx = renovIndices('activas');
+  var noRenuevaIdx = renovIndices('no_renueva');
   var total = terrFiltered.length;
   var pages = Math.max(1, Math.ceil(total / terrPerPage));
   if (terrPage > pages) terrPage = pages;
@@ -1162,9 +1181,11 @@ function renderTerrenosTable() {
   document.getElementById('terr-prev').disabled = terrPage <= 1;
   document.getElementById('terr-next').disabled = terrPage >= pages;
   tbody.innerHTML = slice.map(function(t) {
-    var estado = terrEstadoCalc(t);
-    var rowColor = estado === 'Vencido' ? 'var(--red)' : estado === 'Por Renovar' ? 'var(--orange)' : estado === 'Vigente' ? 'var(--green)' : 'transparent';
-    return '<tr style="border-left:3px solid ' + rowColor + '">'
+    var estado = terrEstadoEfectivo(t, activosIdx, noRenuevaIdx);
+    var rowColor = estado === 'Vencido' ? 'var(--red)' : estado === 'Por Renovar' ? 'var(--orange)' : estado === 'Vigente' ? 'var(--green)'
+      : estado === 'En Renovación' ? 'var(--accent)' : estado === 'No Renueva' ? '#f472b6' : 'transparent';
+    var clickAttr = estado === 'En Renovación' ? ' onclick="showPage(\'renovaciones\')" style="cursor:pointer;border-left:3px solid ' + rowColor + '"' : ' style="border-left:3px solid ' + rowColor + '"';
+    return '<tr' + clickAttr + '>'
       + '<td style="font-weight:500">' + esc(t.e||'–') + '</td>'
       + '<td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + esc(t.ib||'') + '">' + esc(t.ib||'–') + '</td>'
       + '<td style="font-size:11px;color:var(--muted)">' + esc(t.cc||'–') + '</td>'
@@ -1187,9 +1208,11 @@ function changePagTerrenos(dir) {
 
 function exportTerrenosCSV() {
   if (!terrFiltered.length) { toast('Sin datos', 'No hay terrenos para exportar.', 'info'); return; }
+  var activosIdx = renovIndices('activas');
+  var noRenuevaIdx = renovIndices('no_renueva');
   var heads = ['Estructura/Complejo','Ubicación','Cod. Catastral','Categoría','Disponibilidad','Área m2','Avalúo','Canon mensual','Canon anual','Arrendatario','Fecha inicio','Fecha vencimiento','Estado'];
   var rows = terrFiltered.map(function(t) {
-    return [t.e, t.ib, t.cc, t.categ, t.d, t.a, t.av, t.cm, t.ca, t.ar, t.fi, t.fv, terrEstadoCalc(t)]
+    return [t.e, t.ib, t.cc, t.categ, t.d, t.a, t.av, t.cm, t.ca, t.ar, t.fi, t.fv, terrEstadoEfectivo(t, activosIdx, noRenuevaIdx)]
       .map(function(v){ return '"'+String(v==null?'':v).replace(/"/g,'""')+'"'; }).join(',');
   });
   var blob = new Blob(['﻿'+[heads.join(',')].concat(rows).join('\r\n')], {type:'text/csv;charset=utf-8;'});
@@ -3059,10 +3082,15 @@ function subscribeRenovaciones() {
     }, e => console.warn('renovaciones:', e));
 }
 
+function todasLasUnidades() {
+  // Locales/oficinas (BASE_DATA) + terrenos, mismo pool para vincular renovaciones.
+  return getData().concat(getTerrenosData());
+}
+
 function unidadesDe(nombre) {
   const n = normUp(nombre);
   if (!n) return [];
-  return getData().filter(r => r.ar && normUp(r.ar) === n);
+  return todasLasUnidades().filter(r => r.ar && normUp(r.ar) === n);
 }
 
 function pintarLocalesList(units) {
@@ -3071,12 +3099,12 @@ function pintarLocalesList(units) {
   list.innerHTML = units.map(u => `
     <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer">
       <input type="checkbox" value="${u.ref}" ${_renovRefsSel.includes(u.ref)?'checked':''} onchange="toggleRenovRef(${u.ref}, this.checked)">
-      <span>${esc(u.ar||'')} · ${esc(u.e)} - ${esc(u.tb||'')} ${esc(u.ib||'')} ${u.fv?`<span style="color:var(--muted)">(vence ${esc(u.fv)})</span>`:''}</span>
+      <span>${u.tipo==='Terreno'?'🌳 ':''}${esc(u.ar||'')} · ${esc(u.e)} - ${esc(u.tb||'')} ${esc(u.ib||'')} ${u.fv?`<span style="color:var(--muted)">(vence ${esc(u.fv)})</span>`:''}</span>
     </label>`).join('');
 }
 
 function unidadesConRefsSeleccionados() {
-  return getData().filter(r => _renovRefsSel.includes(r.ref));
+  return todasLasUnidades().filter(r => _renovRefsSel.includes(r.ref));
 }
 
 function renderLocalesPicker(units, preselected) {
@@ -3117,8 +3145,8 @@ function filtrarLocalesPicker() {
     pintarLocalesList(Object.values(map));
     return;
   }
-  const resultados = getData().filter(r => r.ar && (
-    normUp(r.ar).includes(q) || normUp(r.e).includes(q) || normUp(r.ib||'').includes(q) || normUp(r.tb||'').includes(q)
+  const resultados = todasLasUnidades().filter(r => (
+    normUp(r.ar||'').includes(q) || normUp(r.e||'').includes(q) || normUp(r.ib||'').includes(q) || normUp(r.tb||'').includes(q) || normUp(r.cc||'').includes(q)
   )).slice(0, 40);
   pintarLocalesList(resultados);
 }
@@ -3154,7 +3182,9 @@ function showAddRenovacion() {
   document.getElementById('rn-arren').oninput = function() {
     const units = unidadesDe(this.value);
     if (units.length === 1) {
-      document.getElementById('rn-bien').value = `${units[0].e} - ${units[0].tb} ${units[0].ib}`;
+      document.getElementById('rn-bien').value = units[0].tipo === 'Terreno'
+        ? `${units[0].e} - ${units[0].ib}`
+        : `${units[0].e} - ${units[0].tb} ${units[0].ib}`;
       if (units[0].fv) document.getElementById('rn-vence').value = units[0].fv.slice(0,10);
     } else if (units.length > 1) {
       document.getElementById('rn-bien').value = `${units[0].e} y ${units.length-1} local(es) más`;
