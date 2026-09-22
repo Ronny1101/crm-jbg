@@ -3173,9 +3173,9 @@ function showAddRenovacion() {
   // Reset save button to create mode
   const btn = document.querySelector('#add-renov-panel .btn-save');
   if (btn) { btn.textContent = 'Guardar'; btn.onclick = ()=>saveRenovacion(null); }
-  // Populate arrendatarios datalist
+  // Populate arrendatarios datalist (locales/oficinas + terrenos)
   const dl = document.getElementById('rn-arren-list');
-  const data = getData();
+  const data = todasLasUnidades();
   const arrs = [...new Set(data.filter(r=>r.ar).map(r=>r.ar))].sort();
   dl.innerHTML = arrs.map(a=>`<option value="${a}">`).join('');
   // Auto-fill bien / mostrar selector de locales cuando el arrendatario tiene más de uno
