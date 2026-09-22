@@ -1887,7 +1887,7 @@ function renderDashboard() {
   // o marcados "no renueva", para que ambos contadores digan lo mismo.
   const dashActivosIdx   = renovIndices('activas');
   const dashNoRenuevaIdx = renovIndices('no_renueva');
-  const alertCnt = data.filter(r => {
+  const alertCnt = todasLasUnidades().filter(r => {
     if (!r.fv || r.d !== 'ALQUILADO') return false;
     if (coincideRenov(r, dashActivosIdx) || coincideRenov(r, dashNoRenuevaIdx)) return false;
     const diff = (new Date(r.fv) - today) / 86400000;
@@ -2156,7 +2156,7 @@ function exportPolCSV() {
 var _alertaFiltro = 'proximos'; // 'vencidos' | 'proximos' | 'vigentes'
 
 function renderAlertas() {
-  var data = getData();
+  var data = todasLasUnidades(); // locales/oficinas + terrenos
   var hoy  = new Date(); hoy.setHours(0,0,0,0);
 
   // Solo unidades realmente alquiladas: un local LIBRE con una fecha vieja de un
@@ -2277,17 +2277,19 @@ function renderAlertaLista(gVencidos, gProximos, gVigentes, enRenovacion, gNoRen
       lbl = diff < 0 ? 'Vencido' : diff+' d\u00edas';
     }
 
+    var esTerreno = r.tipo === 'Terreno';
     var clickFn = (_alertaFiltro === 'renovando' && rv)
       ? 'irARenovacion(\'' + rv.id + '\')'
-      : 'openModal(' + r.ref + ')';
+      : (esTerreno ? "showPage('terrenos')" : 'openModal(' + r.ref + ')');
     var accionTag = (_alertaFiltro === 'renovando' && rv)
       ? '<span style="font-size:10px;color:var(--accent2);margin-left:auto;white-space:nowrap">Ver en Renovaciones →</span>'
       : '';
+    var tipoLbl = esTerreno ? 'Terreno' : (r.tb || '\u2013');
     html += '<div class="alert-item" onclick="'+clickFn+'">'
           + '<div class="alert-dot" style="background:'+col+'"></div>'
           + '<div class="alert-info" style="min-width:0">'
-          + '<div class="alert-main" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">'+(r.ar||'Sin arrendatario')+' \u00b7 '+r.e+etapaTag+accionTag+'</div>'
-          + '<div class="alert-sub">Ref #'+r.ref+' \u00b7 '+r.tb+' \u00b7 '+fmtA(r.a)+' \u00b7 '+fmt(r.cm)+'/mes \u00b7 Vence: '+r.fv+'</div>'
+          + '<div class="alert-main" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">'+(esTerreno?'\ud83c\udf33 ':'')+(r.ar||'Sin arrendatario')+' \u00b7 '+r.e+etapaTag+accionTag+'</div>'
+          + '<div class="alert-sub">Ref #'+r.ref+' \u00b7 '+tipoLbl+' \u00b7 '+fmtA(r.a)+' \u00b7 '+fmt(r.cm)+'/mes \u00b7 Vence: '+r.fv+'</div>'
           + '</div>'
           + '<div class="alert-days" style="color:'+col+';white-space:nowrap">'+lbl+'</div>'
           + '</div>';
