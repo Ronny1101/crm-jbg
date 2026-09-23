@@ -1820,11 +1820,18 @@ function renovIndices(estadoDeseado) {
     lista.filter(function(rv){ return !(rv.refs && rv.refs.length); })
       .map(function(rv){ return normUp(rv.arren); })
   );
-  return { refs: refs, nombres: nombres };
+  // Refs que YA están vinculados explícitamente a CUALQUIER renovación (activa o no).
+  // Si un local tiene dueño explícito por ref en otro lado, no debe "colarse" aquí solo
+  // porque comparte arrendatario con una renovación distinta que no usa refs (ej. un
+  // mismo arrendatario con una renovación activa y otra marcada "no renueva" a la vez).
+  var refsClaimed = new Set();
+  (renovCache||[]).forEach(function(rv){ (rv.refs||[]).forEach(function(ref){ refsClaimed.add(ref); }); });
+  return { refs: refs, nombres: nombres, refsClaimed: refsClaimed };
 }
 
 function coincideRenov(r, idx) {
   if (idx.refs.has(r.ref)) return true;
+  if (idx.refsClaimed.has(r.ref)) return false;
   if (r.ar && idx.nombres.has(normUp(r.ar))) return true;
   return false;
 }
@@ -3168,6 +3175,20 @@ function filtrarLocalesPicker() {
 function toggleRenovRef(ref, checked) {
   if (checked) { if (!_renovRefsSel.includes(ref)) _renovRefsSel.push(ref); }
   else { _renovRefsSel = _renovRefsSel.filter(r => r !== ref); }
+  actualizarBienSegunSeleccion();
+}
+
+function actualizarBienSegunSeleccion() {
+  const bienEl = document.getElementById('rn-bien');
+  if (!bienEl) return;
+  const seleccionadas = unidadesConRefsSeleccionados();
+  if (!seleccionadas.length) return;
+  if (seleccionadas.length === 1) {
+    const u = seleccionadas[0];
+    bienEl.value = u.tipo === 'Terreno' ? `${u.e} - ${u.ib}` : `${u.e} - ${u.tb||''} ${u.ib}`;
+  } else {
+    bienEl.value = `${seleccionadas[0].e} y ${seleccionadas.length-1} local(es) más`;
+  }
 }
 
 function showAddRenovacion() {
