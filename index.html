@@ -3081,6 +3081,18 @@ function subscribeRenovaciones() {
       if (document.getElementById('page-renovaciones')?.classList.contains('active')) {
         renderRenovaciones();
       }
+      // Alertas/Dashboard/Terrenos dependen de renovCache (en renovación / no renueva) —
+      // si no se refrescan aquí, se quedan con datos viejos hasta la próxima navegación.
+      if (document.getElementById('page-alertas')?.classList.contains('active')) {
+        renderAlertas();
+      }
+      if (document.getElementById('page-dashboard')?.classList.contains('active')) {
+        renderDashboard();
+      }
+      if (document.getElementById('page-terrenos')?.classList.contains('active')) {
+        renderTerrenosKPIs();
+        filterTerrenos();
+      }
     }, e => console.warn('renovaciones:', e));
 }
 
