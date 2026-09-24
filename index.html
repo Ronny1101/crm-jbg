@@ -483,6 +483,12 @@ document.addEventListener('DOMContentLoaded', function() {
       </div>
       <div class="kpi-grid" id="alerta-kpis" style="grid-template-columns:repeat(6,1fr);margin-bottom:20px;"></div>
       <div class="table-card">
+        <div class="toolbar">
+          <div class="search-box">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input id="alert-search" placeholder="Buscar arrendatario, edificio/complejo o local…" oninput="renderAlertas()">
+          </div>
+        </div>
         <div class="alert-list" id="alert-list" style="padding:8px 0"></div>
       </div>
     </div>
@@ -2165,6 +2171,14 @@ var _alertaFiltro = 'proximos'; // 'vencidos' | 'proximos' | 'vigentes'
 function renderAlertas() {
   var data = todasLasUnidades(); // locales/oficinas + terrenos
   var hoy  = new Date(); hoy.setHours(0,0,0,0);
+
+  var busqueda = normUp(document.getElementById('alert-search')?.value || '');
+  if (busqueda) {
+    data = data.filter(function(r){
+      var q = normUp((r.ar||'') + ' ' + (r.e||'') + ' ' + (r.ib||'') + ' ' + (r.tb||''));
+      return q.includes(busqueda);
+    });
+  }
 
   // Solo unidades realmente alquiladas: un local LIBRE con una fecha vieja de un
   // contrato anterior no es un "vencido" real — no hay arrendatario que renueve.
